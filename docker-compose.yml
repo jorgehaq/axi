@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analytics
+      POSTGRES_PASSWORD: analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+  web:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DJANGO_DEBUG: "true"
+      SECRET_KEY: dev-secret-change-me
+      DB_ENGINE: postgres
+      DB_NAME: analytics
+      DB_USER: analytics
+      DB_PASSWORD: analytics
+      DB_HOST: db
+      DB_PORT: "5432"
+    volumes:
+      - .:/app
+      - media:/app/media
+    ports:
+      - "8000:8000"
+
+volumes:
+  dbdata:
+  media:
