@@ -63,3 +63,71 @@ class AnalyticsTests(TestCase):
         s = summ.json()["summary"]
         self.assertIn("a", s)
         self.assertIn("mean", s["a"])
+
+
+
+
+
+from io import BytesIO
+from django.test import TestCase, Client
+from django.contrib.auth.models import User
+
+CSV_CONTENT = b"""date,amount,country,category
+2024-01-01,10,CO,A
+2024-01-01,20,CO,B
+2024-01-02,5,PE,A
+2024-01-03,30,CO,A
+2024-01-10,15,AR,B
+"""
+
+class AnalyticsPhase3Tests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user("u2", password="p2")
+        res = self.client.post("/auth/login", data='{"username":"u2","password":"p2"}',
+                               content_type="application/json")
+        self.token = res.json()["token"]
+        csv = BytesIO(CSV_CONTENT)
+        csv.name = "data.csv"
+        up = self.client.post("/upload", {"file": csv}, HTTP_AUTHORIZATION=f"Token {self.token}")
+        self.file_id = up.json()["id"]
+
+    def test_rows_filters_pagination(self):
+        # filtro country=CO, seleccionar columnas y ordenar
+        url = f"/data/{self.file_id}/rows?columns=date,amount,country&f=country,eq,CO&sort=-amount&page=1&page_size=2"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertEqual(payload["page"], 1)
+        self.assertEqual(payload["page_size"], 2)
+        self.assertGreaterEqual(payload["total"], 1)
+        self.assertTrue(isinstance(payload["items"], list))
+        if payload["items"]:
+            self.assertIn("date", payload["items"][0])
+
+    def test_correlation_basic(self):
+        # correlación sobre 'amount' sola (matriz 1x1), debería regresar algo
+        r = self.client.get(f"/data/{self.file_id}/correlation?cols=amount")
+        self.assertEqual(r.status_code, 200)
+        corr = r.json()["correlation"]
+        self.assertIn("amount", corr)
+        self.assertIn("amount", corr["amount"])
+
+    def test_trend_daily_sum(self):
+        # trend por día sumando amount
+        url = f"/data/{self.file_id}/trend?date=date&value=amount&freq=D&agg=sum"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        arr = r.json()["trend"]
+        self.assertTrue(isinstance(arr, list))
+        if arr:
+            self.assertIn("date", arr[0])
+            self.assertIn("amount", arr[0])
+
+    def test_trend_requires_params(self):
+        # falta 'date'
+        r = self.client.get(f"/data/{self.file_id}/trend")
+        self.assertEqual(r.status_code, 400)
+        # agg=count permite omitir 'value'
+        r2 = self.client.get(f"/data/{self.file_id}/trend?date=date&agg=count")
+        self.assertEqual(r2.status_code, 200)

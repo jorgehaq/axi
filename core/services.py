@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 
@@ -22,7 +23,7 @@ def safe_read_csv(file_path: str, nrows: int | None = None) -> pd.DataFrame:
 
 
 
-from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 import math
