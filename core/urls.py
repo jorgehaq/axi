@@ -17,4 +17,3 @@ urlpatterns = [
     path("data/<int:id>/correlation", data_correlation, name="data_correlation"),
     path("data/<int:id>/trend", data_trend, name="data_trend"),
 ]
-
