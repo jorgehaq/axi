@@ -1,0 +1,54 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}
+  REPO: ${{ secrets.GAR_REPO }}
+  SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Autenticación (recomendado: Workload Identity Federation)
+    - id: 'auth'
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+    - uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: gcloud auth configure-docker $REGION-docker.pkg.dev
+
+    - name: Build and Push
+      run: |
+        IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE_NAME:${GITHUB_SHA::7}"
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+        docker build -t $IMAGE .
+        docker push $IMAGE
+
+    - name: Deploy to Cloud Run
+      run: |
+        CONN_NAME=$(gcloud sql instances describe ${{ secrets.CLOUD_SQL_INSTANCE }} --format='value(connectionName)')
+        gcloud run deploy $SERVICE_NAME \
+          --image $IMAGE \
+          --region $REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --add-cloudsql-instances $CONN_NAME \
+          --set-env-vars DJANGO_DEBUG=false,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }} \
+          --set-env-vars DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME,DB_PORT= \
+          --set-env-vars LOG_LEVEL=INFO,WEB_CONCURRENCY=3,ALLOWED_HOSTS="*"
