@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn==21.2.*
 
 COPY . .
 
+RUN chmod +x entrypoint.sh
+
 VOLUME ["/app/media"]
 EXPOSE 8000
 
