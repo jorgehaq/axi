@@ -14,8 +14,10 @@ services:
     build: .
     depends_on:
       - db
+    command: python manage.py runserver 0.0.0.0:8000 
     environment:
-      DJANGO_DEBUG: "true"
+      ENVIRONMENT: "docker"
+      DEBUG: "true"
       SECRET_KEY: dev-secret-change-me
       DB_ENGINE: postgres
       DB_NAME: analytics
@@ -23,6 +25,13 @@ services:
       DB_PASSWORD: analytics
       DB_HOST: db
       DB_PORT: "5432"
+
+      USE_GCS: "false" # Local development
+      # USE_GCS: "true"  # Para probar GCS localmente
+      # GS_BUCKET_NAME: "analytics-api-files-dev"
+      # GOOGLE_APPLICATION_CREDENTIALS: "/app/service-account.json"
+      # volumes:
+      #   - ./service-account.json:/app/service-account.json  # Solo si necesitas key local
     volumes:
       - .:/app
       - media:/app/media
