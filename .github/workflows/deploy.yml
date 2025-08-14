@@ -49,5 +49,5 @@ jobs:
           --allow-unauthenticated \
           --add-cloudsql-instances $CONN_NAME \
           --set-env-vars DJANGO_DEBUG=false,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }} \
-          --set-env-vars DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME,DB_PORT=5432 \
+          --set-env-vars DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME,DB_PORT= \
           --set-env-vars LOG_LEVEL=INFO,WEB_CONCURRENCY=3,ALLOWED_HOSTS="*"
