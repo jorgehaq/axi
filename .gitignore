@@ -7,3 +7,45 @@ db.sqlite3
 *.env
 .env.local
 db.sqlite3
+# Static files (collected automatically)
+staticfiles/
+static/
+
+# Media files (user uploads)
+media/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.gcp
+.env.gcp-local
+
+# Database
+db.sqlite3
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Service account keys
+*.json
+!package*.json
