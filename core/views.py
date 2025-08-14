@@ -3,15 +3,17 @@ from django.contrib.auth import authenticate
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from .models import Token, DataFile
-from django.core.files.uploadedfile import UploadedFile
+# from django.core.files.uploadedfile import UploadedFile
 from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import get_object_or_404
-
+# from google.cloud import storage
+from django.conf import settings
+from datetime import timedelta
+# import logging
 from .permissions import IsOwnerOfDataFile
 from .services import (
     safe_read_csv, DataReadError,
@@ -20,14 +22,9 @@ from .services import (
 )
 from .serializers import TrendParamsSerializer, RowsParamsSerializer
 
-
-"""
 def _json_error(message: str, status: int = 400):
     from django.http import JsonResponse
     return JsonResponse({"error": message}, status=status)
-"""
-
-
 
 @csrf_exempt
 def login_view(request):
@@ -51,10 +48,6 @@ def login_view(request):
     token = Token.create_for(user)
     return JsonResponse({"token": token.key})
 
-
-
-
-
 def _parse_filters(request):
     # ?f=col,op,val (repetible)
     raw = request.query_params.getlist("f")
@@ -67,7 +60,7 @@ def _parse_filters(request):
     return out
 
 
-def _parse_filters(request):
+def _parse_filters2(request):
     """
     Espera filtros repetibles:
       ?f=col,op,value
@@ -87,8 +80,6 @@ def _parse_filters(request):
     return out
 
 
-
-
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health(request):
@@ -98,7 +89,6 @@ def health(request):
 def health(request):
     return JsonResponse({"status": "ok"})
 """
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -147,7 +137,7 @@ def upload_view(request):
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_preview(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    request.check_object_permissions(request, datafile)
+    # request.check_object_permissions(request, datafile)
     try:
         df = safe_read_csv(datafile.file.path, nrows=5)
     except DataReadError as e:
@@ -158,7 +148,7 @@ def data_preview(request, id: int):
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_summary(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    request.check_object_permissions(request, datafile)
+    # request.check_object_permissions(request, datafile)
     try:
         df = safe_read_csv(datafile.file.path)
     except DataReadError as e:
@@ -176,7 +166,7 @@ def data_summary(request, id: int):
 
 
 @require_GET
-def data_summary(request, id: int):
+def data_summary2(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
     try:
         df = safe_read_csv(datafile.file.path)
@@ -204,7 +194,7 @@ def data_summary(request, id: int):
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_rows(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    request.check_object_permissions(request, datafile)
+    # request.check_object_permissions(request, datafile)
     try:
         df = safe_read_csv(datafile.file.path)
     except DataReadError as e:
@@ -226,7 +216,7 @@ def data_rows(request, id: int):
 
 
 @require_GET
-def data_rows(request, id: int):
+def data_rows2(request, id: int):
     """
     Lista filas con filtros, selección de columnas, orden y paginación.
     Params:
@@ -271,7 +261,7 @@ def data_rows(request, id: int):
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_correlation(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    request.check_object_permissions(request, datafile)
+    # request.check_object_permissions(request, datafile)
     try:
         df = safe_read_csv(datafile.file.path)
     except DataReadError as e:
@@ -286,8 +276,9 @@ def data_correlation(request, id: int):
     return Response({"id": datafile.id, "correlation": corr})
 
 
+
 @require_GET
-def data_correlation(request, id: int):
+def data_correlation_otro(request, id: int):
     """
     Correlación Pearson simple.
     Params:
@@ -311,12 +302,13 @@ def data_correlation(request, id: int):
 
 
 
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_trend(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    request.check_object_permissions(request, datafile)
-
+    # request.check_object_permissions(request, datafile)
     params = TrendParamsSerializer(data=request.query_params)
     params.is_valid(raise_exception=True)
     date_col = params.validated_data["date"]
@@ -339,7 +331,7 @@ def data_trend(request, id: int):
 
 
 @require_GET
-def data_trend(request, id: int):
+def data_trend2(request, id: int):
     """
     Trends básicos por fecha.
     Params:
@@ -375,3 +367,73 @@ def data_trend(request, id: int):
 
     return JsonResponse({"id": datafile.id, "trend": out})
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsOwnerOfDataFile])
+def get_download_url_2(request, id: int):
+    """Generate download URL (local or GCS based on configuration)"""
+    datafile = get_object_or_404(DataFile, pk=id)
+    # request.check_object_permissions(request, datafile)
+    
+    # Check if GCS is enabled
+    use_gcs = getattr(settings, 'USE_GCS', False)
+    
+    if not use_gcs:
+        # LOCAL DEVELOPMENT: Return direct media URL
+        logger.info(f"🔧 Using local storage for file {datafile.file.name}")
+        
+        return Response({
+            "download_url": request.build_absolute_uri(datafile.file.url),
+            "expires_in": 900,  # 15 min (mock)
+            "filename": datafile.file.name,
+            "file_size": datafile.file.size,
+            "type": "direct",
+            "storage": "local"
+        })
+    
+    # GCS PRODUCTION: Generate signed URL
+    try:
+        from google.cloud import storage
+        
+        logger.info(f"🌤️ Using GCS storage for file {datafile.file.name}")
+        
+        client = storage.Client()
+        bucket = client.bucket(settings.GS_BUCKET_NAME)
+        blob = bucket.blob(datafile.file.name)
+        
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET"
+        )
+        
+        return Response({
+            "download_url": signed_url,
+            "expires_in": 900,  # 15 min
+            "filename": datafile.file.name,
+            "file_size": datafile.file.size,
+            "type": "signed",
+            "storage": "gcs"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to generate GCS signed URL: {e}")
+        return Response(
+            {"error": {"code": "server_error", "message": f"Could not generate download URL: {str(e)}"}},
+            status=500
+        )
+
+@api_view(["GET"])   
+@permission_classes([IsAuthenticated, IsOwnerOfDataFile])
+def get_download_url(request, id: int):
+    """Generate download URL - LOCAL ONLY"""
+    datafile = get_object_or_404(DataFile, pk=id)
+    # request.check_object_permissions(request, datafile)
+    
+    # Solo retornar URL local
+    return Response({
+        "download_url": request.build_absolute_uri(datafile.file.url),
+        "expires_in": 900,
+        "filename": datafile.file.name,
+        "type": "direct",
+        "storage": "local"
+    })
