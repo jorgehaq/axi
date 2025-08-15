@@ -195,9 +195,15 @@ SIMPLE_JWT = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Analytics API",
-    "DESCRIPTION": "KISS analytics endpoints for CSV previews, summaries, filters, trends and correlations.",
+    "DESCRIPTION": "API para análisis de datos CSV",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": False,
+    },
+    "COMPONENT_SPLIT_REQUEST": True,  # Importante para file uploads
 }
 
 # ============================================================================

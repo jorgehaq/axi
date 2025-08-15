@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from .models import Token, DataFile
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 # from django.core.files.uploadedfile import UploadedFile
 from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404
@@ -20,7 +21,7 @@ from .services import (
     select_columns, apply_filters, apply_sort, paginate,
     compute_correlation, compute_trend,
 )
-from .serializers import TrendParamsSerializer, RowsParamsSerializer
+from .serializers import TrendParamsSerializer, RowsParamsSerializer, FileUploadSerializer
 
 def _json_error(message: str, status: int = 400):
     from django.http import JsonResponse
@@ -90,14 +91,60 @@ def health(request):
     return JsonResponse({"status": "ok"})
 """
 
+@extend_schema(
+    request=FileUploadSerializer,
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string"},
+                "id": {"type": "integer"}
+            }
+        },
+        400: {
+            "type": "object", 
+            "properties": {
+                "error": {
+                    "type": "object",
+                    "properties": {
+                        "code": {"type": "string"},
+                        "message": {"type": "string"}
+                    }
+                }
+            }
+        }
+    },
+    examples=[
+        OpenApiExample(
+            "Upload exitoso",
+            value={"message": "File uploaded successfully", "id": 1},
+            response_only=True,
+        )
+    ],
+    summary="Subir archivo CSV",
+    description="Sube un archivo CSV para análisis. El archivo debe tener extensión .csv"
+)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def upload_view(request):
-    if "file" not in request.FILES:
-        return Response({"error": {"code":"bad_request","message":"CSV file is required (multipart/form-data, field 'file')"}},
-                        status=status.HTTP_400_BAD_REQUEST)
-    datafile = DataFile.objects.create(file=request.FILES["file"], uploaded_by=request.user)
-    return Response({"message": "File uploaded successfully", "id": datafile.id})
+    # Validar con serializer
+    serializer = FileUploadSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(
+            {"error": {"code": "bad_request", "message": serializer.errors}},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Crear el archivo
+    datafile = DataFile.objects.create(
+        file=serializer.validated_data["file"], 
+        uploaded_by=request.user
+    )
+    
+    return Response({
+        "message": "File uploaded successfully", 
+        "id": datafile.id
+    })
 
 
 """
