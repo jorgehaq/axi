@@ -1,11 +1,18 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
+import math
 import pandas as pd
+import numpy as np
 
 class DataReadError(Exception):
     pass
 
 def safe_read_csv(file_path: str, nrows: int | None = None) -> pd.DataFrame:
+    """
+    Función original para leer CSV desde path del sistema de archivos
+    (solo funciona con almacenamiento local)
+    """
     path = Path(file_path)
     if not path.exists():
         raise DataReadError("File not found")
@@ -19,17 +26,22 @@ def safe_read_csv(file_path: str, nrows: int | None = None) -> pd.DataFrame:
         raise DataReadError("Invalid CSV format")
     except Exception as e:
         raise DataReadError(f"Unexpected error: {e}")
-    
 
-
-
-
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
-import math
-import pandas as pd
-import numpy as np
-
+def safe_read_csv_from_file(file_field, nrows: int | None = None) -> pd.DataFrame:
+    """
+    Función nueva para leer CSV desde Django FileField
+    Compatible con almacenamiento local y GCS
+    """
+    try:
+        with file_field.open('r') as f:
+            df = pd.read_csv(f, nrows=nrows, dtype_backend="pyarrow")
+            return df
+    except pd.errors.EmptyDataError:
+        raise DataReadError("Empty file")
+    except pd.errors.ParserError:
+        raise DataReadError("Invalid CSV format")
+    except Exception as e:
+        raise DataReadError(f"Error reading file: {e}")
 
 # -------------------
 # Validación & helpers

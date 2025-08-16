@@ -3,18 +3,15 @@ from django.contrib.auth import authenticate
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from .models import Token, DataFile
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-# from django.core.files.uploadedfile import UploadedFile
+from drf_spectacular.utils import extend_schema, OpenApiExample    
 from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-# from google.cloud import storage
 from django.conf import settings
 from datetime import timedelta
-# import logging
 from .permissions import IsOwnerOfDataFile
 from .services import (
     safe_read_csv, DataReadError,
@@ -22,6 +19,22 @@ from .services import (
     compute_correlation, compute_trend,
 )
 from .serializers import TrendParamsSerializer, RowsParamsSerializer, FileUploadSerializer
+import pandas as pd
+
+# Función auxiliar para leer archivos compatibles con GCS
+def safe_read_csv_from_file(file_field, nrows=None):
+    """
+    Leer CSV desde Django FileField, compatible con GCS y almacenamiento local
+    """
+    try:
+        with file_field.open('r') as f:
+            return pd.read_csv(f, nrows=nrows, dtype_backend="pyarrow")
+    except pd.errors.EmptyDataError:
+        raise DataReadError("Empty file")
+    except pd.errors.ParserError:
+        raise DataReadError("Invalid CSV format")
+    except Exception as e:
+        raise DataReadError(f"Error reading file: {e}")
 
 def _json_error(message: str, status: int = 400):
     from django.http import JsonResponse
@@ -60,7 +73,6 @@ def _parse_filters(request):
             out.append((col, op, value))
     return out
 
-
 def _parse_filters2(request):
     """
     Espera filtros repetibles:
@@ -80,16 +92,10 @@ def _parse_filters2(request):
             out.append((col, op, value))
     return out
 
-
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health(request):
     return Response({"status": "ok"})
-
-"""
-def health(request):
-    return JsonResponse({"status": "ok"})
-"""
 
 @extend_schema(
     request=FileUploadSerializer,
@@ -146,47 +152,12 @@ def upload_view(request):
         "id": datafile.id
     })
 
-
-"""
-def _require_token(request):
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Token "):
-        return None
-    key = auth.split(" ", 1)[1].strip()
-    try:
-        return Token.objects.select_related("user").get(key=key).user
-    except Token.DoesNotExist:
-        return None
-
-
-@csrf_exempt
-def upload_view(request):
-    if request.method != "POST":
-        return HttpResponseBadRequest("POST required")
-
-    user = _require_token(request)
-    if not user:
-        return JsonResponse({"error": "Unauthorized"}, status=401)
-
-    if "file" not in request.FILES:
-        return HttpResponseBadRequest("CSV file is required (multipart/form-data, field name 'file')")
-
-    upload: UploadedFile = request.FILES["file"]
-    # KISS: no validamos CSV aún, solo guardamos
-    datafile = DataFile.objects.create(file=upload, uploaded_by=user)
-    return JsonResponse({"message": "File uploaded successfully", "id": datafile.id})
-"""
-
-
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_preview(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     try:
-        df = safe_read_csv(datafile.file.path, nrows=5)
+        df = safe_read_csv_from_file(datafile.file, nrows=5)
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
     return Response({"id": datafile.id, "rows": df.head(5).to_dict(orient="records")})
@@ -195,9 +166,8 @@ def data_preview(request, id: int):
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_summary(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
 
@@ -211,12 +181,11 @@ def data_summary(request, id: int):
                for col, stats in subset.items()}
     return Response({"id": datafile.id, "summary": summary})
 
-
 @require_GET
 def data_summary2(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return _json_error(str(e), status=400)
 
@@ -233,17 +202,12 @@ def data_summary2(request, id: int):
                for col, stats in subset.items()}
     return JsonResponse({"id": datafile.id, "summary": summary})
 
-
-
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_rows(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
 
@@ -261,7 +225,6 @@ def data_rows(request, id: int):
                        params.validated_data["page_size"])
     return Response(payload)
 
-
 @require_GET
 def data_rows2(request, id: int):
     """
@@ -274,7 +237,7 @@ def data_rows2(request, id: int):
     """
     datafile = get_object_or_404(DataFile, pk=id)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return _json_error(str(e), status=400)
 
@@ -298,19 +261,12 @@ def data_rows2(request, id: int):
     payload = paginate(records, page, page_size)
     return JsonResponse(payload)
 
-
-
-
-
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_correlation(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
 
@@ -322,8 +278,6 @@ def data_correlation(request, id: int):
         return Response({"error": {"code":"bad_request","message": str(ve)}}, status=400)
     return Response({"id": datafile.id, "correlation": corr})
 
-
-
 @require_GET
 def data_correlation_otro(request, id: int):
     """
@@ -333,7 +287,7 @@ def data_correlation_otro(request, id: int):
     """
     datafile = get_object_or_404(DataFile, pk=id)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return _json_error(str(e), status=400)
 
@@ -345,17 +299,10 @@ def data_correlation_otro(request, id: int):
         return _json_error(str(ve), status=400)
     return JsonResponse({"id": datafile.id, "correlation": corr})
 
-
-
-
-
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
 def data_trend(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     params = TrendParamsSerializer(data=request.query_params)
     params.is_valid(raise_exception=True)
     date_col = params.validated_data["date"]
@@ -367,15 +314,12 @@ def data_trend(request, id: int):
         return Response({"error":{"code":"bad_request","message":"Missing 'value' parameter for agg != count"}}, status=400)
 
     try:
-        out = compute_trend(
-            safe_read_csv(datafile.file.path),
-            date_col=date_col, value_col=value_col or date_col, freq=freq, agg=agg
-        )
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
+        out = compute_trend(df, date_col=date_col, value_col=value_col or date_col, freq=freq, agg=agg)
     except (ValueError, DataReadError) as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
 
     return Response({"id": datafile.id, "trend": out})
-
 
 @require_GET
 def data_trend2(request, id: int):
@@ -389,7 +333,7 @@ def data_trend2(request, id: int):
     """
     datafile = get_object_or_404(DataFile, pk=id)
     try:
-        df = safe_read_csv(datafile.file.path)
+        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
     except DataReadError as e:
         return _json_error(str(e), status=400)
 
@@ -419,15 +363,12 @@ def data_trend2(request, id: int):
 def get_download_url_2(request, id: int):
     """Generate download URL (local or GCS based on configuration)"""
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     
     # Check if GCS is enabled
     use_gcs = getattr(settings, 'USE_GCS', False)
     
     if not use_gcs:
         # LOCAL DEVELOPMENT: Return direct media URL
-        logger.info(f"🔧 Using local storage for file {datafile.file.name}")
-        
         return Response({
             "download_url": request.build_absolute_uri(datafile.file.url),
             "expires_in": 900,  # 15 min (mock)
@@ -440,8 +381,6 @@ def get_download_url_2(request, id: int):
     # GCS PRODUCTION: Generate signed URL
     try:
         from google.cloud import storage
-        
-        logger.info(f"🌤️ Using GCS storage for file {datafile.file.name}")
         
         client = storage.Client()
         bucket = client.bucket(settings.GS_BUCKET_NAME)
@@ -463,7 +402,6 @@ def get_download_url_2(request, id: int):
         })
         
     except Exception as e:
-        logger.error(f"❌ Failed to generate GCS signed URL: {e}")
         return Response(
             {"error": {"code": "server_error", "message": f"Could not generate download URL: {str(e)}"}},
             status=500
@@ -474,7 +412,6 @@ def get_download_url_2(request, id: int):
 def get_download_url(request, id: int):
     """Generate download URL - LOCAL ONLY"""
     datafile = get_object_or_404(DataFile, pk=id)
-    # request.check_object_permissions(request, datafile)
     
     # Solo retornar URL local
     return Response({
