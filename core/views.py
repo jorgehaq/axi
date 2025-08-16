@@ -160,7 +160,42 @@ def data_preview(request, id: int):
         df = safe_read_csv_from_file(datafile.file, nrows=5)
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
-    return Response({"id": datafile.id, "rows": df.head(5).to_dict(orient="records")})
+    
+    # NUEVO: Agregar estas 2 líneas
+    rows = df.head(5).to_dict(orient="records")
+    rows = filter_columns(rows, request.query_params.get('fields'))
+    
+    return Response({"id": datafile.id, "rows": rows})  # Cambiar df.head(5).to_dict() por rows
+
+
+# Función auxiliar (agregar al inicio del archivo)
+def filter_columns(data, fields_param):
+    """Filtra columnas basado en el parámetro fields"""
+    if not fields_param:
+        return data  # Sin filtro = devolver todo
+    
+    # Convertir "id,name,date" a ["id", "name", "date"]
+    requested_fields = [f.strip() for f in fields_param.split(',')]
+    
+    # Filtrar solo las columnas que existen
+    if isinstance(data, list) and data:  # Lista de dicts
+        available_fields = data[0].keys()
+        valid_fields = [f for f in requested_fields if f in available_fields]
+        return [{k: v for k, v in row.items() if k in valid_fields} for row in data]
+    
+    return data
+
+
+def filter_columns_dict(data_dict, fields_param):
+    """Filtra un diccionario basado en el parámetro fields"""
+    if not fields_param or not data_dict:
+        return data_dict
+    
+    requested_fields = [f.strip() for f in fields_param.split(',')]
+    return {k: v for k, v in data_dict.items() if k in requested_fields}
+
+
+@require_GET
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
@@ -179,28 +214,14 @@ def data_summary(request, id: int):
     subset = desc.loc[["count", "mean", "std"]].to_dict()
     summary = {col: {k: (float(v) if v is not None else None) for k, v in stats.items()}
                for col, stats in subset.items()}
+    
+
+    # NUEVO: Agregar estas 2 líneas
+    fields = request.query_params.get('fields')
+    summary = filter_columns_dict(summary, fields)
+
     return Response({"id": datafile.id, "summary": summary})
 
-@require_GET
-def data_summary2(request, id: int):
-    datafile = get_object_or_404(DataFile, pk=id)
-    try:
-        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
-    except DataReadError as e:
-        return _json_error(str(e), status=400)
-
-    # Solo columnas numéricas
-    numeric_df = df.select_dtypes(include=["number"])
-    if numeric_df.empty:
-        return JsonResponse({"id": datafile.id, "summary": {} })
-
-    desc = numeric_df.describe()  # count, mean, std, min, 25%, 50%, 75%, max
-    # KISS: entregamos solo count, mean, std como pidió el roadmap
-    subset = desc.loc[["count", "mean", "std"]].to_dict()
-    # Asegura tipos serializables
-    summary = {col: {k: (float(v) if v is not None else None) for k, v in stats.items()}
-               for col, stats in subset.items()}
-    return JsonResponse({"id": datafile.id, "summary": summary})
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsOwnerOfDataFile])
@@ -266,16 +287,18 @@ def data_rows2(request, id: int):
 def data_correlation(request, id: int):
     datafile = get_object_or_404(DataFile, pk=id)
     try:
-        df = safe_read_csv_from_file(datafile.file)  # ✅ CORREGIDO
+        df = safe_read_csv_from_file(datafile.file)
     except DataReadError as e:
         return Response({"error": {"code":"bad_request","message": str(e)}}, status=400)
 
     cols = request.query_params.get("cols")
     cols = [c.strip() for c in cols.split(",")] if cols else None
+    
     try:
         corr = compute_correlation(df, cols)
     except ValueError as ve:
         return Response({"error": {"code":"bad_request","message": str(ve)}}, status=400)
+    
     return Response({"id": datafile.id, "correlation": corr})
 
 @require_GET
@@ -421,3 +444,45 @@ def get_download_url(request, id: int):
         "type": "direct",
         "storage": "local"
     })
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def bulk_upload_view(request):
+    """Subir múltiples archivos CSV de una vez"""
+    files = request.FILES.getlist('files')  # Lista de archivos
+    
+    if not files:
+        return Response(
+            {"error": {"code": "bad_request", "message": "No files provided"}},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    results = []
+    for file in files:
+        # Validar cada archivo
+        if not file.name.endswith('.csv'):
+            results.append({
+                "filename": file.name,
+                "status": "error",
+                "message": "Only CSV files allowed"
+            })
+            continue
+            
+        # Crear DataFile para cada archivo válido
+        try:
+            datafile = DataFile.objects.create(file=file, uploaded_by=request.user)
+            results.append({
+                "filename": file.name,
+                "status": "success", 
+                "id": datafile.id
+            })
+        except Exception as e:
+            results.append({
+                "filename": file.name,
+                "status": "error",
+                "message": str(e)
+            })
+    
+    return Response({"results": results})
