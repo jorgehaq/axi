@@ -133,6 +133,7 @@ def paginate(records: List[Dict[str, Any]], page: int, page_size: int) -> Dict[s
     pages = max(1, math.ceil(total / page_size))
     start = (page - 1) * page_size
     end = start + page_size
+    
     return {
         "page": page,
         "page_size": page_size,
@@ -140,6 +141,8 @@ def paginate(records: List[Dict[str, Any]], page: int, page_size: int) -> Dict[s
         "pages": pages,
         "has_next": page < pages,
         "has_prev": page > 1,
+        "next_page": page + 1 if page < pages else None,
+        "prev_page": page - 1 if page > 1 else None,
         "items": records[start:end],
     }
 

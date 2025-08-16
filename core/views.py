@@ -95,7 +95,29 @@ def _parse_filters2(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health(request):
-    return Response({"status": "ok"})
+    # Verificar base de datos
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    # Verificar storage
+    try:
+        from django.core.files.storage import default_storage
+        # Intentar listar archivos (operación básica)
+        default_storage.listdir('.')
+        storage_status = "ok"
+    except Exception as e:
+        storage_status = f"error: {str(e)}"
+    
+    return Response({
+        "status": "ok" if db_status == "ok" and storage_status == "ok" else "degraded",
+        "database": db_status,
+        "storage": storage_status
+    })
 
 @extend_schema(
     request=FileUploadSerializer,
@@ -486,3 +508,28 @@ def bulk_upload_view(request):
             })
     
     return Response({"results": results})
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def bulk_delete_view(request):
+    """Eliminar múltiples datasets de una vez"""
+    ids = request.data.get('ids', [])
+    
+    if not ids or not isinstance(ids, list):
+        return Response(
+            {"error": {"code": "bad_request", "message": "Missing or invalid 'ids' array"}},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Filtrar solo los archivos del usuario actual (seguridad)
+    user_files = DataFile.objects.filter(id__in=ids, uploaded_by=request.user)
+    deleted_count = user_files.count()
+    
+    # Eliminar
+    user_files.delete()
+    
+    return Response({
+        "message": f"Deleted {deleted_count} datasets",
+        "deleted_ids": list(ids[:deleted_count])
+    })
