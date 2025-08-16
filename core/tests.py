@@ -41,7 +41,7 @@ class CoreDRFTests(TestCase):
 
     def test_health(self):
         # ✅ ESTE SÍ FUNCIONA - no cambió
-        res = self.client.get("/api/health/")
+        res = self.client.get("/api/v1/health/")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json().get("status"), "ok")
 
@@ -76,7 +76,7 @@ class CoreDRFTests(TestCase):
         csv_bytes = BytesIO(b"a,b\n1,2\n")
         csv_bytes.name = "test.csv"
         
-        res = self.client.post("/api/datasets/upload", 
+        res = self.client.post("/api/v1/datasets/upload", 
                               {"file": csv_bytes}, 
                               HTTP_AUTHORIZATION=f"Bearer {token}")
         self.assertEqual(res.status_code, 200)
@@ -87,25 +87,32 @@ class AnalyticsTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user("u1", password="p1")
-        # login
-        res = self.client.post("/auth/login", data='{"username":"u1","password":"p1"}',
-                               content_type="application/json")
-        self.token = res.json()["token"]
+        
+        # JWT login (CORREGIDO: usar /api/token/)
+        res = self.client.post("/api/token/", {
+            "username": "u1", 
+            "password": "p1"
+        })
+        self.token = res.json()["access"]  # CORREGIDO: access en lugar de token
 
     def _auth(self):
-        return {"HTTP_AUTHORIZATION": f"Token {self.token}"}
+        # CORREGIDO: Bearer en lugar de Token
+        return {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
 
     def test_preview_and_summary(self):
         csv = BytesIO(b"a,b,c\n1,2,3\n4,5,6\n7,8,9\n")
         csv.name = "s.csv"
-        up = self.client.post("/upload", {"file": csv}, **self._auth())
+        
+        # CORREGIDO: agregar / al inicio
+        up = self.client.post("/api/v1/datasets/upload", {"file": csv}, **self._auth())
         file_id = up.json()["id"]
 
-        prev = self.client.get(f"/data/{file_id}/preview")
+        # CORREGIDO: agregar /api/v1/ prefix
+        prev = self.client.get(f"/api/v1/datasets/{file_id}/preview", **self._auth())
         self.assertEqual(prev.status_code, 200)
         self.assertTrue(len(prev.json()["rows"]) <= 5)
 
-        summ = self.client.get(f"/data/{file_id}/summary")
+        summ = self.client.get(f"/api/v1/datasets/{file_id}/summary", **self._auth())
         self.assertEqual(summ.status_code, 200)
         s = summ.json()["summary"]
         self.assertIn("a", s)
@@ -143,7 +150,7 @@ class AnalyticsPhase3Tests(TestCase):
         # Upload with local storage (no GCS)
         csv = BytesIO(CSV_CONTENT)
         csv.name = "data.csv"
-        up = self.client.post("/api/datasets/upload", 
+        up = self.client.post("/api/v1/datasets/upload", 
                              {"file": csv}, 
                              HTTP_AUTHORIZATION=f"Bearer {self.token}")
         
@@ -154,7 +161,7 @@ class AnalyticsPhase3Tests(TestCase):
         return {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
 
     def test_rows_filters_pagination(self):
-        url = f"/api/datasets/{self.file_id}/rows?columns=date,amount,country&f=country,eq,CO&sort=-amount&page=1&page_size=2"
+        url = f"/api/v1/datasets/{self.file_id}/rows?columns=date,amount,country&f=country,eq,CO&sort=-amount&page=1&page_size=2"
         r = self.client.get(url, **self._auth_headers())
         self.assertEqual(r.status_code, 200)
         payload = r.json()
@@ -164,25 +171,25 @@ class AnalyticsPhase3Tests(TestCase):
         self.assertTrue(isinstance(payload["items"], list))
 
     def test_correlation_basic(self):
-        r = self.client.get(f"/api/datasets/{self.file_id}/correlation?cols=amount", 
+        r = self.client.get(f"/api/v1/datasets/{self.file_id}/correlation?cols=amount", 
                            **self._auth_headers())
         self.assertEqual(r.status_code, 200)
         corr = r.json()["correlation"]
         self.assertIn("amount", corr)
 
     def test_trend_daily_sum(self):
-        url = f"/api/datasets/{self.file_id}/trend?date=date&value=amount&freq=D&agg=sum"
+        url = f"/api/v1/datasets/{self.file_id}/trend?date=date&value=amount&freq=D&agg=sum"
         r = self.client.get(url, **self._auth_headers())
         self.assertEqual(r.status_code, 200)
         arr = r.json()["trend"]
         self.assertTrue(isinstance(arr, list))
 
     def test_trend_requires_params(self):
-        r = self.client.get(f"/api/datasets/{self.file_id}/trend", 
+        r = self.client.get(f"/api/v1/datasets/{self.file_id}/trend", 
                            **self._auth_headers())
         self.assertEqual(r.status_code, 400)
         
-        r2 = self.client.get(f"/api/datasets/{self.file_id}/trend?date=date&agg=count", 
+        r2 = self.client.get(f"/api/v1/datasets/{self.file_id}/trend?date=date&agg=count", 
                             **self._auth_headers())
         self.assertEqual(r2.status_code, 200)
 
@@ -211,7 +218,7 @@ class DebugUploadTest(TestCase):
         csv = BytesIO(b"a,b\n1,2\n")
         csv.name = "debug.csv"
         
-        up = self.client.post("/api/datasets/upload", 
+        up = self.client.post("/api/v1/datasets/upload", 
                              {"file": csv}, 
                              HTTP_AUTHORIZATION=f"Bearer {token}")
         
@@ -220,3 +227,58 @@ class DebugUploadTest(TestCase):
         
         # Don't assert yet, just see what happens
         return up
+    
+
+
+
+class BulkOperationsTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user("bulk_user", password="pass123")
+        
+        # JWT authentication  
+        res = self.client.post("/api/token/", {
+            "username": "bulk_user", 
+            "password": "pass123"
+        })
+        self.token = res.json()["access"]
+        
+    def _auth_headers(self):
+        return {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
+
+    def test_bulk_delete_success(self):
+        # Crear algunos archivos de prueba
+        csv1 = BytesIO(b"a,b\n1,2\n")
+        csv1.name = "test1.csv"
+        csv2 = BytesIO(b"x,y\n3,4\n")
+        csv2.name = "test2.csv"
+        
+        # Upload files
+        up1 = self.client.post("/api/v1/datasets/upload", 
+                              {"file": csv1}, **self._auth_headers())
+        up2 = self.client.post("/api/v1/datasets/upload", 
+                              {"file": csv2}, **self._auth_headers())
+        
+        file1_id = up1.json()["id"]
+        file2_id = up2.json()["id"]
+        
+        # Test bulk delete
+        response = self.client.delete("/api/v1/datasets/bulk-delete",
+                                    data={"ids": [file1_id, file2_id]},
+                                    content_type="application/json",
+                                    **self._auth_headers())
+        
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["message"], "Deleted 2 datasets")
+        self.assertEqual(len(result["deleted_ids"]), 2)
+
+    def test_bulk_delete_invalid_data(self):
+        # Test sin IDs
+        response = self.client.delete("/api/v1/datasets/bulk-delete",
+                                    data={},
+                                    content_type="application/json", 
+                                    **self._auth_headers())
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Missing or invalid", response.json()["error"]["message"])
