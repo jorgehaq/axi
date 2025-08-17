@@ -282,3 +282,66 @@ class BulkOperationsTests(TestCase):
         
         self.assertEqual(response.status_code, 400)
         self.assertIn("Missing or invalid", response.json()["error"]["message"])
+
+
+
+class CohortAnalysisTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user("cohort_user", password="pass123")
+        
+        # JWT token
+        res = self.client.post("/api/token/", {
+            "username": "cohort_user", 
+            "password": "pass123"
+        })
+        self.token = res.json()["access"]
+        
+    def _auth_headers(self):
+        return {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
+
+    def test_cohort_analysis_success(self):
+        # CSV con datos de cohort
+        csv_content = """user_id,registration_date,activity_date,revenue
+user_001,2024-01-15,2024-01-15,25.99
+user_001,2024-02-10,2024-02-10,15.50
+user_002,2024-01-20,2024-01-20,40.00
+user_003,2024-02-01,2024-02-01,22.50"""
+        
+        csv_file = BytesIO(csv_content.encode())
+        csv_file.name = "cohort_test.csv"
+        
+        # Upload
+        upload_res = self.client.post("/api/v1/datasets/upload", 
+                                     {"file": csv_file}, **self._auth_headers())
+        file_id = upload_res.json()["id"]
+        
+        # Cohort analysis
+        response = self.client.post(f"/api/v1/datasets/{file_id}/cohort-analysis",
+                                   **self._auth_headers())
+        
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        
+        # Validar estructura
+        self.assertIn("analysis_type", result)
+        self.assertEqual(result["analysis_type"], "cohort_retention")
+        self.assertIn("results", result)
+        self.assertIn("cohort_sizes", result["results"])
+        self.assertIn("retention_rates", result["results"])
+
+    def test_cohort_analysis_missing_columns(self):
+        # CSV sin columnas requeridas
+        csv_content = "id,name,date\n1,test,2024-01-01"
+        csv_file = BytesIO(csv_content.encode())
+        csv_file.name = "invalid.csv"
+        
+        upload_res = self.client.post("/api/v1/datasets/upload", 
+                                     {"file": csv_file}, **self._auth_headers())
+        file_id = upload_res.json()["id"]
+        
+        response = self.client.post(f"/api/v1/datasets/{file_id}/cohort-analysis",
+                                   **self._auth_headers())
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Missing required columns", response.json()["error"])

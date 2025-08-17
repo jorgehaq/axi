@@ -1,9 +1,11 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+from datetime import datetime
 import math
 import pandas as pd
 import numpy as np
+from operator import attrgetter
 
 class DataReadError(Exception):
     pass
@@ -188,3 +190,51 @@ def compute_trend(
     s = df2.set_index("_dt").resample(freq)[value_col].agg(agg_fn)
     s = s.dropna()
     return [{"date": i.isoformat(), value_col: float(v) if v is not None else None} for i, v in s.items()]
+
+
+def cohort_analysis_simple(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Análisis de cohorts básico para entender retención
+    """
+    # Convertir fechas
+    df['registration_date'] = pd.to_datetime(df['registration_date'])
+    df['activity_date'] = pd.to_datetime(df['activity_date'])
+    
+    # Crear cohort groups (mes de registro)
+    df['cohort_month'] = df['registration_date'].dt.to_period('M')
+    df['activity_month'] = df['activity_date'].dt.to_period('M')
+    
+    # Calcular period number (meses desde registro)
+    df['period_number'] = (df['activity_month'] - df['cohort_month']).apply(lambda x: x.n)
+    
+    # Tabla de usuarios únicos por cohort y período
+    cohort_data = df.groupby(['cohort_month', 'period_number'])['user_id'].nunique().reset_index()
+    cohort_table = cohort_data.pivot(index='cohort_month', columns='period_number', values='user_id').fillna(0)
+    
+    # Calcular tasas de retención
+    cohort_sizes = cohort_table[0]  # Tamaño inicial de cada cohort (period 0)
+    retention_table = cohort_table.divide(cohort_sizes, axis=0)
+    
+    # Preparar resultados
+    cohort_results = {}
+    for cohort in retention_table.index:
+        cohort_results[str(cohort)] = {}
+        for period in retention_table.columns:
+            if period in retention_table.loc[cohort]:
+                rate = retention_table.loc[cohort, period]
+                if pd.notna(rate):
+                    cohort_results[str(cohort)][f"month_{int(period)}"] = round(float(rate), 3)
+    
+    return {
+        "cohort_sizes": {str(k): int(v) for k, v in cohort_sizes.items()},
+        "retention_rates": cohort_results,
+        "interpretation": [
+            f"Cohort {cohort}: {int(size)} usuarios iniciales"
+            for cohort, size in cohort_sizes.items()
+        ],
+        "summary": {
+            "total_cohorts": len(cohort_sizes),
+            "avg_cohort_size": round(cohort_sizes.mean(), 1),
+            "total_users": df['user_id'].nunique()
+        }
+    }

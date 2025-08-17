@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import login_view, upload_view, health, data_preview, data_summary, data_rows, data_correlation, data_trend, get_download_url, bulk_upload_view, bulk_delete_view
+from .views import login_view, upload_view, health, data_preview, data_summary, data_rows, data_correlation, data_trend, get_download_url, bulk_upload_view, bulk_delete_view, cohort_analysis_view
 
 urlpatterns = [
     # LOGIN, UPLOAD, HEALTHCHECK 
@@ -18,6 +18,7 @@ urlpatterns = [
     path("datasets/<int:id>/rows", data_rows, name="data_rows"),
     path("datasets/<int:id>/correlation", data_correlation, name="data_correlation"),
     path("datasets/<int:id>/trend", data_trend, name="data_trend"),
+    path("datasets/<int:id>/cohort-analysis", cohort_analysis_view, name="cohort_analysis"),
 
     path("datasets/<int:id>/download-url/", get_download_url, name="download_url"),
 ]

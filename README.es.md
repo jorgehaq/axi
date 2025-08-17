@@ -215,6 +215,28 @@ Todos requieren `Authorization: Bearer <access>` excepto `/api/health/`.
 - `GET /api/datasets/{id}/download-url/` — Generar URL de descarga firmada.  
   → `{ "download_url": "...", "expires_in": 900, "type": "signed", "storage": "gcs" }`
 
+
+### Análisis de Cohortes
+
+Analizar retención de usuarios por cohortes de registro:
+
+```bash
+POST /api/v1/datasets/{id}/cohort-analysis
+
+{
+  "analysis_type": "cohort_retention",
+  "results": {
+    "cohort_sizes": {"2024-01": 150, "2024-02": 200},
+    "retention_rates": {
+      "2024-01": {"month_0": 1.0, "month_1": 0.65, "month_2": 0.42}
+    }
+  }
+}
+```
+
+
+
+
 ### Filtros, orden y paginación
 
 Ejemplos:

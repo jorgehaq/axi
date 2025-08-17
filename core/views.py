@@ -16,10 +16,11 @@ from .permissions import IsOwnerOfDataFile
 from .services import (
     safe_read_csv, DataReadError,
     select_columns, apply_filters, apply_sort, paginate,
-    compute_correlation, compute_trend,
+    compute_correlation, compute_trend, cohort_analysis_simple
 )
 from .serializers import TrendParamsSerializer, RowsParamsSerializer, FileUploadSerializer
 import pandas as pd
+import io
 
 # Función auxiliar para leer archivos compatibles con GCS
 def safe_read_csv_from_file(file_field, nrows=None):
@@ -533,3 +534,48 @@ def bulk_delete_view(request):
         "message": f"Deleted {deleted_count} datasets",
         "deleted_ids": list(ids[:deleted_count])
     })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cohort_analysis_view(request, id):
+    """Análisis de cohorts para entender retención de usuarios"""
+    try:
+        # Obtener dataset
+        dataset = DataFile.objects.get(id=id, uploaded_by=request.user)
+        
+        # Leer CSV - CAMBIO AQUÍ
+        import io
+        dataset.file.seek(0)  # Ir al inicio del archivo
+        file_content = dataset.file.read()
+        df = pd.read_csv(io.BytesIO(file_content))
+        
+        # Validar columnas requeridas
+        required_cols = ['user_id', 'registration_date', 'activity_date']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        
+        if missing_cols:
+            return Response({
+                "error": f"Missing required columns: {missing_cols}",
+                "required": required_cols,
+                "available": list(df.columns)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Ejecutar análisis
+        result = cohort_analysis_simple(df)
+        
+        return Response({
+            "dataset_id": id,
+            "analysis_type": "cohort_retention",
+            "total_users": df['user_id'].nunique(),
+            "date_range": {
+                "start": str(df['registration_date'].min()),
+                "end": str(df['activity_date'].max())
+            },
+            "results": result
+        })
+        
+    except DataFile.DoesNotExist:
+        return Response({"error": "Dataset not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
