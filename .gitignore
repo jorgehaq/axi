@@ -51,3 +51,4 @@ Thumbs.db
 !package*.json
 .venv/
 test_data.csv
+*.csv

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from core.storage import get_media_storage
 import uuid
 
 # core/models.py - OPCIONAL: Custom upload path
@@ -34,7 +35,7 @@ def dataset_upload_path(instance, filename):
 class DataFile(models.Model):
     file = models.FileField(
         upload_to=dataset_upload_path,
-        # storage=get_media_storage,  # Si usas custom storage
+        storage=get_media_storage,  # Si usas custom storage
     )
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     uploaded_at = models.DateTimeField(auto_now_add=True)
