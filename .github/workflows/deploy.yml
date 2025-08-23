@@ -63,3 +63,17 @@ jobs:
             --set-env-vars "USE_GCS=${{ secrets.USE_GCS }},GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME }}" \
             --set-env-vars "LOG_LEVEL=INFO,WEB_CONCURRENCY=3" \
             --cpu=1 --memory=512Mi --timeout=300
+
+      - name: Bootstrap Users
+        run: |
+          echo "🔧 Creating bootstrap users..."
+          gcloud run jobs create bootstrap-users-${{ github.run_number }} \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --add-cloudsql-instances "$CONN_NAME" \
+            --set-env-vars "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }},DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME" \
+            --command python \
+            --args "manage.py,bootstrap" \
+            --execute-now \
+            --wait
+          echo "✅ Bootstrap completed!"      

@@ -52,3 +52,6 @@ Thumbs.db
 .venv/
 test_data.csv
 *.csv
+
+# Environment files (contain secrets)
+.env.docker
