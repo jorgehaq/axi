@@ -70,7 +70,7 @@ jobs:
           gcloud run jobs create bootstrap-users-${{ github.run_number }} \
             --image "$IMAGE" \
             --region "$REGION" \
-            --add-cloudsql-instances "$CONN_NAME" \
+            --set-cloudsql-instances "$CONN_NAME" \
             --set-env-vars "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }},DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME" \
             --command python \
             --args "manage.py,bootstrap" \
