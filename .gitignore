@@ -55,3 +55,6 @@ test_data.csv
 
 # Environment files (contain secrets)
 .env.docker
+
+# Test data files
+*.csv
