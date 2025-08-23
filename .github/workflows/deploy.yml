@@ -2,7 +2,7 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" ]  
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -13,42 +13,53 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     permissions:
       contents: 'read'
       id-token: 'write'
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # Autenticación (recomendado: Workload Identity Federation)
-    - id: 'auth'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+      # Auth con SA key (si luego migras a WIF, cambiamos esto)
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v2
 
-    - name: Configure Docker for Artifact Registry
-      run: gcloud auth configure-docker $REGION-docker.pkg.dev
+      # 🔧 Fijar proyecto para todos los gcloud
+      - name: Set gcloud project
+        run: gcloud config set project "$PROJECT_ID"
 
-    - name: Build and Push
-      run: |
-        IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE_NAME:${GITHUB_SHA::7}"
-        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-        docker build -t $IMAGE .
-        docker push $IMAGE
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "$REGION-docker.pkg.dev"
 
-    - name: Deploy to Cloud Run
-      run: |
-        CONN_NAME=$(gcloud sql instances describe ${{ secrets.CLOUD_SQL_INSTANCE }} --format='value(connectionName)')
-        gcloud run deploy $SERVICE_NAME \
-          --image $IMAGE \
-          --region $REGION \
-          --platform managed \
-          --allow-unauthenticated \
-          --add-cloudsql-instances $CONN_NAME \
-          --set-env-vars DJANGO_DEBUG=false,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }} \
-          --set-env-vars DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME,DB_PORT= \
-          --set-env-vars LOG_LEVEL=INFO,WEB_CONCURRENCY=3,ALLOWED_HOSTS="*"
-          --set-env-vars USE_GCS=${{ secrets.USE_GCS }},GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME}},ENVIRONMENT=${{ secrets.GS_BUCKET_NAME }} 
+      - name: Build and Push
+        run: |
+          IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE_NAME:${GITHUB_SHA::7}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Get Cloud SQL connection name
+        id: sql
+        run: |
+          CONN_NAME=$(gcloud sql instances describe "${{ secrets.CLOUD_SQL_INSTANCE }}" \
+            --project "$PROJECT_ID" --format='value(connectionName)')
+          echo "CONN_NAME=$CONN_NAME" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE_NAME" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --add-cloudsql-instances "$CONN_NAME" \
+            --set-env-vars "ENVIRONMENT=${{ secrets.ENVIRONMENT }}" \
+            --set-env-vars "DEBUG=false,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" \
+            --set-env-vars "DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME" \
+            --set-env-vars "USE_GCS=${{ secrets.USE_GCS }},GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME }}" \
+            --set-env-vars "LOG_LEVEL=INFO,WEB_CONCURRENCY=3" \
+            --cpu=1 --memory=512Mi --timeout=300
