@@ -25,9 +25,6 @@ elif ENVIRONMENT == "docker":
 elif ENVIRONMENT == "gcp-local":         # ← NUEVO
     load_dotenv(".env.gcp-local")        # ← Testing GCP local
     print("☁️ GCP-LOCAL: Cargando .env.gcp-local")
-elif ENVIRONMENT == "gcp" or ENVIRONMENT == "production":
-    load_dotenv(".env.gcp")              # ← Solo producción
-    print("☁️ GCP: Cargando .env.gcp")
 else:
     print("🔵 PRODUCTION: Variables del sistema")
 
