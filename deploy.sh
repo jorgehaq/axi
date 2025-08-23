@@ -15,3 +15,29 @@ echo "Building and deploying: $IMAGE"
 docker build -t $IMAGE .
 docker push $IMAGE
 gcloud run deploy $SERVICE_NAME --image $IMAGE --region $REGION --allow-unauthenticated
+
+# Al final de deploy.sh, agregar:
+echo "🔧 Running bootstrap command..."
+gcloud run jobs create bootstrap-users \
+  --image $IMAGE \
+  --region $REGION \
+  --add-cloudsql-instances $CONN_NAME \
+  --set-env-vars DB_ENGINE=postgres,DB_NAME=analytics,DB_USER=analytics,DB_PASSWORD=$DB_PASSWORD,DB_HOST=/cloudsql/$CONN_NAME \
+  --command python \
+  --args "manage.py,bootstrap" \
+  --execute-now \
+  --wait
+
+# Al final de deploy.sh, agregar:
+echo "🔧 Running bootstrap command..."
+gcloud run jobs create bootstrap-users \
+  --image $IMAGE \
+  --region $REGION \
+  --add-cloudsql-instances $CONN_NAME \
+  --set-env-vars DB_ENGINE=postgres,DB_NAME=analytics,DB_USER=analytics,DB_PASSWORD=$DB_PASSWORD,DB_HOST=/cloudsql/$CONN_NAME \
+  --command python \
+  --args "manage.py,bootstrap" \
+  --execute-now \
+  --wait
+
+echo "✅ Bootstrap completed!"
