@@ -58,3 +58,7 @@ test_data.csv
 
 # Test data files
 *.csv
+
+# test_all_environment.sh
+test_all_environment.sh
+start.sh
