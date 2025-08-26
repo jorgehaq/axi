@@ -44,12 +44,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'drf_spectacular',
     'core',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -60,6 +62,68 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.StructuredLoggingMiddleware',
 ]
+
+# CORS por ambiente
+if ENVIRONMENT == "local":
+    # Development: permite todo para facilitar desarrollo
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    print("🔓 LOCAL: CORS permite todos los orígenes")
+    
+elif ENVIRONMENT == "docker":
+    # Docker: permite localhost y contenedores
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",  # Vite
+        "http://localhost:3000",  # React dev server
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+    print("🐳 DOCKER: CORS configurado para localhost")
+    
+elif ENVIRONMENT == "gcp-local":
+    # Testing GCP local: igual que local pero controlado
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+    print("☁️ GCP-LOCAL: CORS para desarrollo con GCP")
+    
+else:
+    # Production: solo dominios específicos
+    CORS_ALLOWED_ORIGINS = [
+        "https://nexus-frontend.run.app",  # ← Tu frontend en producción
+        "https://your-custom-domain.com",   # ← Tu dominio personalizado
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+    print("🔒 PRODUCTION: CORS restrictivo para seguridad")
+
+# Headers permitidos para NEXUS
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Métodos permitidos
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
 
 ROOT_URLCONF = 'analytics_api.urls'
 WSGI_APPLICATION = 'analytics_api.wsgi.application'
