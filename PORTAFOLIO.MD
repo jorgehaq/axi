@@ -27,8 +27,9 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 
 **Ambientes:**
 
-- Local: Docker Compose
-- Dev/Staging/Prod: Cloud Run auto-deploy
+- Local/Test: Docker Compose + PostgreSQL nativo Ubuntu (DB por servicio)
+- CI/CD: GitHub Actions (unit tests con PostgreSQL Docker)
+- Dev/Staging/Prod: Cloud Run auto-deploy + Cloud SQL
 - start.sh por ambiente
 
 **Valor:** Base sólida REST + SQL avanzado + auth enterprise + deploy GCP. Primer proyecto del portfolio (2-3 semanas).
@@ -76,7 +77,8 @@ ___
 
 **Environments:**
 
-- Local: Docker compose
+- Local/Test: Docker Compose + PostgreSQL nativo Ubuntu (compartido)
+- CI/CD: GitHub Actions (unit tests con PostgreSQL Docker)
 - Dev/Staging/Prod: Cloud Run + Cloud SQL
 
 **Database:**
@@ -96,7 +98,7 @@ ___
 **AIDE (AI-Driven Engine)**
 
 - FastAPI: 8001
-- PostgreSQL: 5433 (separate instance)
+- PostgreSQL: 5432 (shared instance)
 - Redis: 6380
 
 **AIDE (AI-Driven Engine)**
@@ -143,8 +145,9 @@ ___
 
 **Ambientes:**
 
-- Local: Docker + MySQL
-- Dev/Staging/Prod: Cloud Run + Cloud SQL
+- Local/Test: Docker Compose (FastAPI + MySQL) + PostgreSQL nativo Ubuntu para lecturas compartidas
+- CI/CD: GitHub Actions (unit tests con MySQL/PostgreSQL Docker)
+- Dev/Staging/Prod: Cloud Run + Cloud SQL (MySQL) integrado con PostgreSQL compartido
 
 **Base datos:**
 
@@ -205,9 +208,10 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 
 **Environments:**
 
-- Local: Docker Kafka cluster
-- Dev/Staging: Cloud Run + Pub/Sub
-- Prod: GCP Pub/Sub + Cloud Functions
+- Local/Test: Docker Compose (Kafka cluster) + PostgreSQL nativo Ubuntu
+- CI/CD: GitHub Actions (unit tests con Kafka/PostgreSQL Docker)
+- Dev/Staging: Cloud Run + Pub/Sub + Cloud SQL (event store)
+- Prod: GCP Pub/Sub + Cloud Functions + Cloud SQL
 
 **Data:**
 
@@ -230,7 +234,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 - Kafka: 9092
 - Zookeeper: 2181
 - Redis: 6382
-- PostgreSQL: 5434
+- PostgreSQL: 5432 (shared event store)
 
 **ECHO - Event-Coordinated Hybrid Orchestrator**
 
@@ -277,7 +281,8 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 
 **Environments:**
 
-- Local: Docker Compose
+- Local/Test: Docker Compose + PostgreSQL nativo Ubuntu (schema-per-tenant)
+- CI/CD: GitHub Actions (unit tests con PostgreSQL Docker)
 - Dev/Staging/Prod: Cloud Run + Cloud SQL
 - Tenant-specific quotas and rate limits
 
@@ -286,7 +291,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 **MINT (Multi-tenant Intelligence Network Terminal)**
 
 - FastAPI: 8007
-- PostgreSQL: 5435
+- PostgreSQL: 5433 (dedicated instance)
 - Redis: 6383
 - Kafka: 9093
 
@@ -425,9 +430,10 @@ VITE_AIDE_API_URL=localhost:8030/api/v1
 
 **Environments:**
 
-- Local: `localhost:3000` → ADTECH API
-- Dev: Auto-deploy to Firebase/Vercel
-- Staging: Pre-prod validation
+- Local/Test: `localhost:3000` apuntando a APIs backend locales/cloud
+- CI/CD: GitHub Actions (unit tests/Vitest, mocks)  
+- Dev: Deploy automático a Firebase/Vercel (usa Cloud SQL backends)
+- Staging: Pre-prod validation con servicios Cloud
 - Prod: CDN distribution
 
 **Database:** None - pure frontend consuming ADTECH MySQL backend
@@ -517,8 +523,9 @@ MLOG - MongoDB Audit & Analytics Microservice
 
 **Environments:**
 
-- Local: Docker Compose MongoDB
-- Dev/Prod: MongoDB Atlas
+- Local/Test: Docker Compose MongoDB + PostgreSQL nativo Ubuntu para correlaciones
+- CI/CD: GitHub Actions (unit tests con MongoDB Docker)
+- Dev/Staging/Prod: MongoDB Atlas (conectado a Cloud SQL/PostgreSQL shared)
 - Export: Scheduled BigQuery sync
 
 **Performance:** 10K+ events/minute, sub-100ms queries with indexes on timestamp+service+user_id.
@@ -646,6 +653,9 @@ $ git config --global --list
 user.email=44485505+jorgehaq@users.noreply.github.com
 user.name=Jorge Alvarez
 
+- CI pipelines (GitHub Actions) corren únicamente unit tests.
+- Integration/E2E tests se ejecutan manualmente en local o Dev/Staging.
+
 
 ## Git Strategic
 
@@ -678,4 +688,59 @@ PostgreSQL Shared (5432):
 PostgreSQL MINT (5433):
 - mint_master
 - tenant_schemas
+```
+
+## Estrategia de ambientes y testing
+
+- `LOCAL`: PostgreSQL nativo Ubuntu para desarrollo diario.
+- `TEST`: PostgreSQL nativo Ubuntu con bases separadas por servicio.
+- `CI/CD`: GitHub Actions ejecuta solo unit tests contra PostgreSQL Docker efímero.
+- `DEV`: Cloud Run + Cloud SQL (instancia "portfolio-dev").
+- `STAGING`: Cloud Run + Cloud SQL (instancia "portfolio-staging").
+- `PROD`: Cloud Run + Cloud SQL (instancia "portfolio-prod").
+- `Integration/E2E`: se corren en local o en ambientes Cloud (DEV/STAGING) según el caso.
+
+# LOCAL (Development)
+```
+PostgreSQL local Ubuntu
+├── axi_db_local
+├── aide_db_local  
+├── echo_db_local
+└── grasp_db_local
+```
+
+# DEV (Integration Testing)
+```
+Cloud SQL Instance "portfolio-dev"
+├── axi_db_dev
+├── aide_db_dev
+├── echo_db_dev
+└── grasp_db_dev
+```
+
+# STAGING (Pre-production)
+```
+Cloud SQL Instance "portfolio-staging" 
+├── axi_db_staging
+├── aide_db_staging
+├── echo_db_staging
+└── grasp_db_staging
+```
+
+# PROD (Production)
+```
+Cloud SQL Instance "portfolio-prod"
+├── axi_db_prod
+├── aide_db_prod
+├── echo_db_prod
+└── grasp_db_prod
+```
+
+# Project root
+```
+├── .env.local
+├── .env.dev  
+├── .env.staging
+├── .env.prod
+└── .env.example
 ```
