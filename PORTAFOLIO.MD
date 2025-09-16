@@ -15,6 +15,28 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 **Monitoreo**
 - Logs consolidados en Cloud Logging con `correlation_id` transversal para trazabilidad.
 - Métricas de bases de datos rastrean `connection_pool_utilization` y `query_latency` en todos los entornos.
+- Observabilidad extendida con dashboards Prometheus/Grafana y alerting en Cloud Monitoring (latencia, errores, saturación de colas).
+
+**Documentación y arquitectura**
+- ADRs versionados por proyecto (`docs/adr/*`).
+- Diagramas C4 y de despliegue en `/docs/architecture/` actualizados por release.
+- Benchmarks de performance publicados (latencia p95/p99, throughput) para AXI, AIDE, GRASP y ECHO.
+
+**Testing & Quality Gates**
+- Cobertura unitaria ≥90% en backends y frontends clave.
+- Suites integration/E2E automatizadas (pytest + Playwright) ejecutadas en Dev y Staging.
+- Load testing con k6/Locust enlazado a reports de benchmarks.
+- CI/CD GitHub Actions con security scanning (Bandit, Snyk, Trivy) como gates.
+
+**Infraestructura & Deploy**
+- Infraestructura versionada con Terraform + Terragrunt (Cloud Run, Cloud SQL, Redis, Pub/Sub, GCS).
+- Pipelines blue-green/rolling con approvals antes de promover a Prod.
+- Gestión y rotación automática de secretos vía Secret Manager y sync a runtime.
+
+**Seguridad & Identidad**
+- OAuth2/OIDC (Auth0 + GCP IAP) integrado con servicios backend y NEXUS.
+- Escaneos SAST/DAST, dependabot alerts y rotación de claves/API cada 30 días.
+- Endurecimiento de imágenes Docker y controles VPC Service Controls.
 
 ---
 
@@ -91,6 +113,7 @@ ___
 - POST /analyze-dataset → statistical summaries with explanations
 
 **Data Flow:** AXI datasets → AIDE processing → LLM enrichment → structured insights
+- BigQuery integration para pipelines ML y almacenamiento de datasets enriquecidos usando jobs analíticos.
 
 **Environments:**
 
@@ -103,6 +126,7 @@ ___
 - Reads from AXI PostgreSQL (no separate DB)
 - Stores insight cache in Redis
 - SQL execution sandboxed (read-only, whitelist)
+- Export datasets → BigQuery → insights agregados para reporting avanzado.
 
 **Security:**
 
@@ -238,6 +262,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 - Async processing pipelines
 - Circuit breaker patterns
 - Dead letter queues
+- Streaming continuo hacia BigQuery warehouse para analytics históricos de eventos
 
 **Database:** Events table: event_id, timestamp, source_service, payload, status
 
@@ -264,6 +289,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 - monitoring: event tracing, consumer lag metrics
 - testing: event replay, consumer isolation tests
 - serialization: Avro schemas, schema registry
+- BigQuery habilita queries SQL petabyte-scale y dashboards agregados de eventos
  
 ---
 
@@ -395,6 +421,11 @@ VITE_AIDE_API_URL=localhost:8030/api/v1
 - performance: code splitting, lazy loading, memoization
 - testing: MSW mocks, component testing, integration tests
 - types: strict TypeScript, API contract validation
+
+**Operación NEXUS**
+- Consumo integral de APIs AXI, AIDE, GRASP, ECHO y MINT mediante TanStack Query y Axios interceptors.
+- Deploy continuo a Firebase Hosting (branch `main`) con CDN global y demo pública monitorizada.
+- Observabilidad front-to-back con Web Vitals, Lighthouse CI y correlación de logs hacia Cloud Logging/Grafana.
 
 
 
@@ -538,7 +569,7 @@ MLOG - MongoDB Audit & Analytics Microservice
 - GET /analytics/{service}
 - GET /metrics/timeline
 
-**Integration:** Other services POST events via async HTTP client with circuit breaker.
+**Integration:** Other services POST events via async HTTP client con circuit breaker y jobs programados MongoDB → BigQuery para analytics históricos.
 
 **Environments:**
 
@@ -547,7 +578,7 @@ MLOG - MongoDB Audit & Analytics Microservice
 - Dev/Staging/Prod: MongoDB Atlas (conectado a Cloud SQL/PostgreSQL shared)
 - Export: Scheduled BigQuery sync
 
-**Performance:** 10K+ events/minute, sub-100ms queries with indexes on timestamp+service+user_id.
+**Performance:** 10K+ events/minute, sub-100ms queries con indexes en timestamp+service+user_id y consultas BigQuery SQL sobre datos históricos.
 
 
 **MLOG (MongoDB Audit & Analytics)**
@@ -646,25 +677,12 @@ GENERAL
 
 
 
-**Pytest configurado en:**
+**Testing cross-project**
 
-AXI - pytest fixtures, mocks externos, coverage >90% AIDE - async-test target, load-test, prompt-test ECHO - event replay, consumer isolation tests MINT - tenant-test target, schema validation MLOG - aggregation-test, index performance tests
-
-**Faltantes pytest:**
-
-GRASP - solo menciona "GraphQL query testing, resolver unit tests" NEXUS - tiene "component testing, integration tests" pero no especifica pytest ADUI - no especifica framework testing
-
-**Recomendación:**
-
-pytest para todos los backends Python (AXI, AIDE, GRASP, ECHO, MINT, MLOG)
-
-- pytest-asyncio para FastAPI async
-- pytest-django para Django
-- pytest-cov para coverage
-- pytest-mock para mocking
-- pytest-xdist para parallel execution
-
-Frontend mantén Jest/Vitest según stack React.
+- Pytest matrices por servicio: AXI (fixtures, coverage >90%), AIDE (async/load/prompt tests), GRASP (GraphQL resolver/integration), ECHO (event replay/consumer), MINT (tenant schema validation), MLOG (aggregation/index performance).
+- Frontends NEXUS/ADUI cubiertos con Vitest + Playwright (component, integration, E2E) y reporting en CI.
+- Reglas pytest: pytest-asyncio, pytest-django, pytest-cov, pytest-mock, pytest-xdist habilitados en `pytest.ini` compartido.
+- Pipelines ejecutan smoke, integration y load tests (k6/Locust) antes de aprobar despliegues.
 
 ## Github
 
@@ -672,8 +690,8 @@ $ git config --global --list
 user.email=44485505+jorgehaq@users.noreply.github.com
 user.name=Jorge Alvarez
 
-- CI pipelines (GitHub Actions) corren únicamente unit tests.
-- Integration/E2E tests se ejecutan manualmente en local o Dev/Staging.
+- CI pipelines (GitHub Actions) ejecutan unit/integration/E2E, security scanning y despliegues controlados.
+- Playwright + k6 jobs corren en Dev/Staging previo a promover a producción.
 
 
 ## Git Strategic
