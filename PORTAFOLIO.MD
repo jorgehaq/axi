@@ -15,28 +15,31 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 **Monitoreo**
 - Logs consolidados en Cloud Logging con `correlation_id` transversal para trazabilidad.
 - Métricas de bases de datos rastrean `connection_pool_utilization` y `query_latency` en todos los entornos.
-- Observabilidad extendida con dashboards Prometheus/Grafana y alerting en Cloud Monitoring (latencia, errores, saturación de colas).
+- Observabilidad extendida con dashboards Prometheus/Grafana, alerting en Cloud Monitoring (latencia, errores, saturación de colas) y SLIs/SLOs: uptime 99.9% para AXI, p99 <300 ms, error budget monitoreado por servicio.
 
 **Documentación y arquitectura**
-- ADRs versionados por proyecto (`docs/adr/*`).
+- ADRs versionados por proyecto (`docs/adr/*`) con formato standard (Context → Decisión → Consecuencias); ejemplo: Kafka vs Pub/Sub en ECHO.
 - Diagramas C4 y de despliegue en `/docs/architecture/` actualizados por release.
 - Benchmarks de performance publicados (latencia p95/p99, throughput) para AXI, AIDE, GRASP y ECHO.
+- Runbooks de operaciones (`docs/runbooks/*.md`) para rollback, incident response y mitigación de cuellos de botella DB.
 
 **Testing & Quality Gates**
 - Cobertura unitaria ≥90% en backends y frontends clave.
 - Suites integration/E2E automatizadas (pytest + Playwright) ejecutadas en Dev y Staging.
-- Load testing con k6/Locust enlazado a reports de benchmarks.
-- CI/CD GitHub Actions con security scanning (Bandit, Snyk, Trivy) como gates.
+- Load testing semanal con k6/Locust en Staging simulando 1000 usuarios concurrentes, reportado en dashboards.
+- CI/CD GitHub Actions con security scanning (Bandit, Snyk, Trivy) y OWASP ZAP DAST como gates obligatorios.
 
 **Infraestructura & Deploy**
-- Infraestructura versionada con Terraform + Terragrunt (Cloud Run, Cloud SQL, Redis, Pub/Sub, GCS).
-- Pipelines blue-green/rolling con approvals antes de promover a Prod.
+- Infraestructura versionada con Terraform + Terragrunt (`infrastructure/{dev,staging,prod}/`) cubriendo Cloud Run, Cloud SQL, Redis, Pub/Sub, GCS.
+- Makefile central (raíz) con targets `start-all`, `test-all`, `deploy-all <env>` que orquestan scripts/start.sh y pipelines IaC.
+- Pipelines blue-green/rolling mantienen versión previa activa hasta superar smoke tests y tráfico real, con rollback automático vía comando/webhook.
 - Gestión y rotación automática de secretos vía Secret Manager y sync a runtime.
 
 **Seguridad & Identidad**
 - OAuth2/OIDC (Auth0 + GCP IAP) integrado con servicios backend y NEXUS.
-- Escaneos SAST/DAST, dependabot alerts y rotación de claves/API cada 30 días.
+- Escaneos SAST/DAST (incluye OWASP ZAP), dependabot alerts y rotación de claves/API cada 30 días.
 - Endurecimiento de imágenes Docker y controles VPC Service Controls.
+- Estrategia de circuit breakers y retries con exponential backoff aplicada a todos los microservicios (detallado en runbooks).
 
 ---
 
@@ -285,7 +288,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 - makefile: kafka-setup, event-replay, consumer-test targets
 - arquitectura: /events/{producers,consumers,schemas}/, /handlers/, /sagas/
 - patrones: Saga pattern, Event Sourcing, CQRS y Dead Letter Queues con sistema de event replay para reprocesar flujos fallidos
-- reliability: idempotency keys, retry with exponential backoff
+- reliability: idempotency keys, circuit breakers validados y retries con exponential backoff uniformes
 - monitoring: event tracing, consumer lag metrics
 - testing: event replay, consumer isolation tests
 - serialization: Avro schemas, schema registry
@@ -642,7 +645,7 @@ GENERAL
 
 ## Aplicar a otros proyectos
 
-**AXI**: Circuit breaker + correlation IDs + bulk CSV processing **AIDE**: Rate limiting LLM calls + cache strategies + prompt versioning **GRASP**: Query complexity limits + DataLoader patterns + field permissions **ECHO**: Dead letter queues + saga patterns + event replay **MINT**: Schema-per-tenant + quota enforcement + tenant metrics isolation **NEXUS**: Error boundaries + MSW mocking + performance budgets
+**AXI**: Circuit breakers + correlation IDs + bulk CSV processing **AIDE**: Rate limiting LLM calls + cache strategies + prompt versioning **GRASP**: Query complexity limits + DataLoader patterns + field permissions **ECHO**: Dead letter queues + saga patterns + event replay + retries/backoff **MINT**: Schema-per-tenant + quota enforcement + tenant metrics isolation **NEXUS**: Error boundaries + MSW mocking + performance budgets
 
 
 ## Stack patterns extraíbles (from MLOG)
