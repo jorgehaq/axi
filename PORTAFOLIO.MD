@@ -24,12 +24,14 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 - Runbooks de operaciones (`docs/runbooks/*.md`) para rollback, incident response y mitigación de cuellos de botella DB.
 - README.md por proyecto estructurado con: header (propósito + stack + badges), Quick Start (`make install/dev/test`), API docs (`/docs`, `/redoc`, `/graphql`, Postman collection), setup (`cp .env.example` + `./start.sh`), endpoints clave y ejemplos request/response.
 - Directorio `docs/` con `api.md`, `performance.md`, `deployment.md`, data lineage BigQuery y ETL pipelines documentados.
+- Root con `.github/{workflows/{ci.yml,deploy.yml},ISSUE_TEMPLATE/,pull_request_template.md,dependabot.yml}` para estandarizar CI/CD y gobernanza.
 
 **Testing & Quality Gates**
 - Cobertura unitaria ≥90% en backends y frontends clave.
 - Suites integration/E2E automatizadas (pytest + Playwright) ejecutadas en Dev y Staging.
 - Load testing semanal con k6/Locust en Staging simulando 1000 usuarios concurrentes, reportado en dashboards.
 - CI/CD GitHub Actions con security scanning (Bandit, Snyk, Trivy) y OWASP ZAP DAST como gates obligatorios.
+- Workflow `ci.yml` estandarizado (pytest, black --check, ruff check) + `deploy.yml` para promociones automáticas post-aprobación.
 - E2E portfolio root (`e2e-tests/`) con pipelines cross-service (user journey, service mesh, data pipeline) y chaos tests.
 - Tests de resiliencia/performance/cross_service por proyecto (`tests/{resilience,performance,cross_service}/`).
 
@@ -39,12 +41,21 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 - Pipelines blue-green/rolling mantienen versión previa activa hasta superar smoke tests y tráfico real, con rollback automático vía comando/webhook.
 - Gestión y rotación automática de secretos vía Secret Manager y sync a runtime.
 - Estructura portfolio root incluye `scripts/{deploy_all.sh,health_check_all.py,backup_all_dbs.py}`, `infrastructure/{monitoring,chaos_testing}/`, `monitoring/{alerts.yml,dashboards.json,sli_slo.yml}` y `chaos/network_partition.py`.
+- Scripts de base de datos (`scripts/db-setup.sh`, `scripts/db-migrate.sh`) crean y sincronizan schemas por servicio.
 
 **Seguridad & Identidad**
 - OAuth2/OIDC (Auth0 + GCP IAP) integrado con servicios backend y NEXUS.
 - Escaneos SAST/DAST (incluye OWASP ZAP), dependabot alerts y rotación de claves/API cada 30 días.
 - Endurecimiento de imágenes Docker y controles VPC Service Controls.
 - Estrategia de circuit breakers y retries con exponential backoff aplicada a todos los microservicios (detallado en runbooks).
+- Branch protection rules (PR review + status checks) aplicadas vía GitHub CLI automation.
+
+-**CLI & Secrets**
+- GitHub CLI, GCloud CLI y MongoDB (`gh auth login`, `gcloud auth login`, `mongosh`) configurados con tokens locales, aliases (`gcp-dev`, `gcp-prod`, `db-local`, `k8s-logs`) y branch protection via `gh api .../branches/main/protection`.
+- `scripts/setup-env.sh` coordina variables por entorno; `.env.template` versionado + `.env.local` gitignored para credenciales reales.
+- Estrategia de secretos: variables locales, GCP Secret Manager (`gcloud secrets create`) y GitHub Secrets (`gh secret set`).
+- Cross-project scripts (`deploy_all.sh`, `setup-env.sh`, `db-migrate.sh`, `health-check-all.py`, `backup_all_dbs.py`) automatizan despliegues y chequeos.
+- Flujo Git estándar: `git checkout -b feature/...`, push, `gh pr create`, `gh workflow run deploy.yml --ref main` tras merge.
 
 ---
 
@@ -702,6 +713,8 @@ GENERAL
 - Pipelines ejecutan smoke, integration y load tests (k6/Locust) antes de aprobar despliegues.
 - Cross-service suites (`tests/cross_service/test_data_flow.py`, `tests/data_integrity/test_cross_db_consistency.py`, `tests/resilience/test_circuit_breakers.py`) garantizan integridad AXI↔AIDE↔ECHO↔MLOG y resiliencia ante fallos externos.
 - Orquestación end-to-end en `e2e-tests/test_full_user_journey.py`, `test_service_mesh.py`, `test_data_pipeline.py` ejecutada previo a releases mayores.
+- `scripts/health-check-all.py` monitorea endpoints `/health` cross-service y se ejecuta post-deploy desde CI/CD o CLI.
+- Escenarios de caos/carga (`chaos/network_partition.py`, `scenarios/peak_load.py`) validan resiliencia ante fallas y picos 10x.
 
 ## Github
 
