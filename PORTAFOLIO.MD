@@ -1,5 +1,21 @@
 hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc muy compacto y sintetizado
 
+## Estrategia de Operaciones (Ops) y Base de Datos
+
+**Gestión de conexiones**
+- Local: `pool_size=5`, `timeout=5s` para desarrollo controlado.
+- Dev/Staging: `pool_size=10-15`, `timeout=15s` con auto-reintentos.
+- Prod: `pool_size=20+`, `timeout=30s`, `max_connections_per_service` definido y `idle_cleanup` habilitado.
+
+**Seguridad**
+- Manejo de secretos centralizado en **GCP Secret Manager** (credenciales y API keys).
+- Despliegues en **VPC** privada con segmentación de subredes por servicio.
+- Reglas de firewall limitan el acceso a puertos de bases de datos solo a dependencias autorizadas.
+
+**Monitoreo**
+- Logs consolidados en Cloud Logging con `correlation_id` transversal para trazabilidad.
+- Métricas de bases de datos rastrean `connection_pool_utilization` y `query_latency` en todos los entornos.
+
 ---
 
 **AXI - Analytics eXperience Intelligence**
@@ -17,6 +33,7 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 - Models: DataFile, AnalysisResult, CustomUser, UserProfile
 - SQL: Window functions, CTEs, índices compuestos
 - Analytics: correlaciones, cohorts, summaries vía raw SQL
+- Backups: estrategia **Point-in-time recovery (PITR)** con ventana de 30 días en producción.
 
 **Endpoints clave:**
 
@@ -89,9 +106,10 @@ ___
 
 **Security:**
 
+- Claves OpenAI/Claude gestionadas con GCP Secret Manager, rotación cada 30 días y scoping por ambiente.
 - JWT from AXI (token forwarding)
 - Input sanitization for SQL injection prevention
-- Rate limiting on LLM calls
+- Rate limiting on LLM calls with service-level quotas to avoid abuse
 
 **Implementation time:** 1-2 weeks
 
@@ -142,6 +160,7 @@ ___
 - Query complexity limits
 - Depth limiting
 - Field-level caching
+- Connection pooling para SQLAlchemy async con tamaño ajustado a patrones GraphQL
 
 **Ambientes:**
 
@@ -240,7 +259,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 
 - makefile: kafka-setup, event-replay, consumer-test targets
 - arquitectura: /events/{producers,consumers,schemas}/, /handlers/, /sagas/
-- patrones: Saga pattern, Event Sourcing, CQRS, Dead Letter Queue
+- patrones: Saga pattern, Event Sourcing, CQRS y Dead Letter Queues con sistema de event replay para reprocesar flujos fallidos
 - reliability: idempotency keys, retry with exponential backoff
 - monitoring: event tracing, consumer lag metrics
 - testing: event replay, consumer isolation tests
@@ -263,7 +282,7 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 **Architecture:**
 
 - Tenant resolver middleware (subdomain/header)
-- Schema isolation: `tenant_{id}`
+- Schema isolation: `tenant_{id}` con Alembic + procedimientos de rollout/rollback por cliente y migration locks para evitar concurrencia
 - Multi-tenant data pipeline
 - Real-time metrics engine
 
@@ -540,10 +559,10 @@ MLOG - MongoDB Audit & Analytics Microservice
 
 **MLOG - MongoDB Audit & Analytics**
 
-- makefile: index-analyze, aggregation-test targets
+- makefile: index-analyze, aggregation-test targets implementados en CI/CD para validar desempeño de la base de datos
 - arquitectura: /aggregations/, /indexes/, /migrations/
 - patrones: Aggregation Builder pattern, Index optimization, Time-series collections
-- performance: compound indexes, aggregation pipeline optimization
+- performance: compound indexes, aggregation pipeline optimization y sharding por `timestamp` con **TTL indexes** para lifecycle management
 - scalability: sharding strategies, read replicas
 - data lifecycle: TTL indexes, archival strategies
 - monitoring: slow query analysis, index usage stats
