@@ -22,18 +22,23 @@ hablame de [PROJECT] lo que hace, tecnologias usadas, ambientes, data, bd etc mu
 - Diagramas C4 y de despliegue en `/docs/architecture/` actualizados por release.
 - Benchmarks de performance publicados (latencia p95/p99, throughput) para AXI, AIDE, GRASP y ECHO.
 - Runbooks de operaciones (`docs/runbooks/*.md`) para rollback, incident response y mitigación de cuellos de botella DB.
+- README.md por proyecto estructurado con: header (propósito + stack + badges), Quick Start (`make install/dev/test`), API docs (`/docs`, `/redoc`, `/graphql`, Postman collection), setup (`cp .env.example` + `./start.sh`), endpoints clave y ejemplos request/response.
+- Directorio `docs/` con `api.md`, `performance.md`, `deployment.md`, data lineage BigQuery y ETL pipelines documentados.
 
 **Testing & Quality Gates**
 - Cobertura unitaria ≥90% en backends y frontends clave.
 - Suites integration/E2E automatizadas (pytest + Playwright) ejecutadas en Dev y Staging.
 - Load testing semanal con k6/Locust en Staging simulando 1000 usuarios concurrentes, reportado en dashboards.
 - CI/CD GitHub Actions con security scanning (Bandit, Snyk, Trivy) y OWASP ZAP DAST como gates obligatorios.
+- E2E portfolio root (`e2e-tests/`) con pipelines cross-service (user journey, service mesh, data pipeline) y chaos tests.
+- Tests de resiliencia/performance/cross_service por proyecto (`tests/{resilience,performance,cross_service}/`).
 
 **Infraestructura & Deploy**
 - Infraestructura versionada con Terraform + Terragrunt (`infrastructure/{dev,staging,prod}/`) cubriendo Cloud Run, Cloud SQL, Redis, Pub/Sub, GCS.
 - Makefile central (raíz) con targets `start-all`, `test-all`, `deploy-all <env>` que orquestan scripts/start.sh y pipelines IaC.
 - Pipelines blue-green/rolling mantienen versión previa activa hasta superar smoke tests y tráfico real, con rollback automático vía comando/webhook.
 - Gestión y rotación automática de secretos vía Secret Manager y sync a runtime.
+- Estructura portfolio root incluye `scripts/{deploy_all.sh,health_check_all.py,backup_all_dbs.py}`, `infrastructure/{monitoring,chaos_testing}/`, `monitoring/{alerts.yml,dashboards.json,sli_slo.yml}` y `chaos/network_partition.py`.
 
 **Seguridad & Identidad**
 - OAuth2/OIDC (Auth0 + GCP IAP) integrado con servicios backend y NEXUS.
@@ -137,6 +142,8 @@ ___
 - JWT from AXI (token forwarding)
 - Input sanitization for SQL injection prevention
 - Rate limiting on LLM calls with service-level quotas to avoid abuse
+- API docs: FastAPI autodocs (`/docs`, `/redoc`), Postman collection con variables por entorno y flujo de auth.
+- Scripts complementarios: `scripts/load_test.py`, `scripts/seed_large_data.py`, `scripts/db_monitor.py`, `monitoring/health_checks.py`, `monitoring/sli_slo.yml` alineados con SLIs (llm_response_time 2s, cache hit >80%).
 
 **Implementation time:** 1-2 weeks
 
@@ -218,6 +225,8 @@ ___
 - security: query whitelisting, field-level permissions
 - testing: GraphQL query testing, resolver unit tests
 - schema: federation-ready design
+- API docs: `/graphql` con GraphiQL, documentación en `docs/api.md` + Postman Collection GraphQL.
+- Scripts: `scripts/load_test.py` (query stress), `scripts/monitor_db.py` (pool usage), dashboards en `monitoring/dashboards.json`.
 
 
 
@@ -293,6 +302,8 @@ ECHO - Event-Coordinated Hybrid Orchestrator
 - testing: event replay, consumer isolation tests
 - serialization: Avro schemas, schema registry
 - BigQuery habilita queries SQL petabyte-scale y dashboards agregados de eventos
+- API docs: `/api/docs` + collection Postman multi-servicio, health checks en `monitoring/health_checks.py`.
+- Tests: `tests/resilience/test_circuit_breakers.py`, `tests/cross_service/test_data_flow.py`, `tests/data_integrity/test_cross_db_consistency.py`.
  
 ---
 
@@ -429,6 +440,7 @@ VITE_AIDE_API_URL=localhost:8030/api/v1
 - Consumo integral de APIs AXI, AIDE, GRASP, ECHO y MINT mediante TanStack Query y Axios interceptors.
 - Deploy continuo a Firebase Hosting (branch `main`) con CDN global y demo pública monitorizada.
 - Observabilidad front-to-back con Web Vitals, Lighthouse CI y correlación de logs hacia Cloud Logging/Grafana.
+- README expone endpoints backend consumidos, `docs/api.md` para flows UI ↔ API y `tests/cross_service` para journeys completos.
 
 
 
@@ -600,6 +612,8 @@ MLOG - MongoDB Audit & Analytics Microservice
 - scalability: sharding strategies, read replicas
 - data lifecycle: TTL indexes, archival strategies
 - monitoring: slow query analysis, index usage stats
+- BigQuery analytics documentado en `docs/performance.md` y queries ejemplos.
+- Scripts: `scripts/generate_events.py`, `scripts/load_test.py`, `scripts/monitor_db.py`, `monitoring/sli_slo.yml`.
 
 
 
@@ -686,6 +700,8 @@ GENERAL
 - Frontends NEXUS/ADUI cubiertos con Vitest + Playwright (component, integration, E2E) y reporting en CI.
 - Reglas pytest: pytest-asyncio, pytest-django, pytest-cov, pytest-mock, pytest-xdist habilitados en `pytest.ini` compartido.
 - Pipelines ejecutan smoke, integration y load tests (k6/Locust) antes de aprobar despliegues.
+- Cross-service suites (`tests/cross_service/test_data_flow.py`, `tests/data_integrity/test_cross_db_consistency.py`, `tests/resilience/test_circuit_breakers.py`) garantizan integridad AXI↔AIDE↔ECHO↔MLOG y resiliencia ante fallos externos.
+- Orquestación end-to-end en `e2e-tests/test_full_user_journey.py`, `test_service_mesh.py`, `test_data_pipeline.py` ejecutada previo a releases mayores.
 
 ## Github
 
