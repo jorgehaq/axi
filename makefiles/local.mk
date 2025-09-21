@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 .PHONY: \
-  local-services local-install-deps local-django local-celery local-flower local-redis local-postgres-up
+  local-services local-install-deps local-django local-celery local-flower local-redis local-postgres-up local-test-env
 
 include .env.local
 export
@@ -45,3 +45,6 @@ local-migrations:
 local-django:
 	.venv/bin/python manage.py runserver 8000
 
+# tests
+local-test-env:
+	bash scripts/test_all_environment.sh local
