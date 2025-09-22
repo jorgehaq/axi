@@ -54,3 +54,6 @@ local-test-makefile:
 
 local-test-oauth2:
 	bash scripts/test_oauth2_integration.sh local
+
+local-test-missing:
+	bash scripts/test_missing_endpoints.sh local
