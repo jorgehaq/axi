@@ -46,7 +46,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_spectacular',
-    'core',
+    'core',  # App base v1 (se mantiene por compatibilidad)
+    'apps.auth',
+    'apps.datasets',
+    'apps.analytics',
 ]
 
 MIDDLEWARE = [
