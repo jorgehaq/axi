@@ -20,10 +20,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - id: auth
+      - name: Preflight auth inputs
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY_DEV }}" ] && { [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}" ]; }; then
+            echo "You must configure either GCP_SA_KEY_DEV (JSON) or both GCP_WORKLOAD_IDENTITY_PROVIDER_DEV and GCP_SERVICE_ACCOUNT_DEV (WIF)." >&2
+            exit 1
+          fi
+
+      - name: Auth via Service Account JSON
+        if: ${{ secrets.GCP_SA_KEY_DEV != '' }}
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - name: Auth via Workload Identity Federation
+        if: ${{ secrets.GCP_SA_KEY_DEV == '' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV != '' && secrets.GCP_SERVICE_ACCOUNT_DEV != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -75,4 +90,3 @@ jobs:
             --execute-now \
             --wait
           echo "Bootstrap dev completed!"
-
