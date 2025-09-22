@@ -89,11 +89,15 @@ git push origin dev
 make -f makefiles/dev.mk dev-test-real
 ```
 
+CI/CD secrets for dev/prod are documented in `docs/ci-secrets.md`.
+
 ### Staging/Production
 ```bash
 # Deploy via GitHub Actions (branch: main)
 git push origin main
 ```
+
+CI/CD secrets required for production are listed in `docs/ci-secrets.md`.
 
 ## Environment Variables
 
