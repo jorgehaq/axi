@@ -1,14 +1,14 @@
-name: Deploy to Cloud Run
+name: Deploy to Cloud Run Dev
 
 on:
   push:
-    branches: [ "main" ]  
+    branches: [ "dev" ]
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.GCP_REGION }}
-  REPO: ${{ secrets.GAR_REPO }}
-  SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_DEV }}
+  REGION: us-central1
+  REPO: axi-dev-repo
+  SERVICE_NAME: axi-dev-api
 
 jobs:
   deploy:
@@ -20,15 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Auth con SA key (si luego migras a WIF, cambiamos esto)
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      # 🔧 Fijar proyecto para todos los gcloud
       - name: Set gcloud project
         run: gcloud config set project "$PROJECT_ID"
 
@@ -45,11 +43,11 @@ jobs:
       - name: Get Cloud SQL connection name
         id: sql
         run: |
-          CONN_NAME=$(gcloud sql instances describe "${{ secrets.CLOUD_SQL_INSTANCE }}" \
+          CONN_NAME=$(gcloud sql instances describe "${{ secrets.CLOUD_SQL_INSTANCE_DEV }}" \
             --project "$PROJECT_ID" --format='value(connectionName)')
           echo "CONN_NAME=$CONN_NAME" >> $GITHUB_ENV
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run Dev
         run: |
           gcloud run deploy "$SERVICE_NAME" \
             --image "$IMAGE" \
@@ -57,23 +55,24 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --set-cloudsql-instances "$CONN_NAME" \
-            --set-env-vars "ENVIRONMENT=${{ secrets.ENVIRONMENT }}" \
-            --set-env-vars "DEBUG=false,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" \
-            --set-env-vars "DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME" \
-            --set-env-vars "USE_GCS=${{ secrets.USE_GCS }},GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME }}" \
-            --set-env-vars "LOG_LEVEL=INFO,WEB_CONCURRENCY=3" \
+            --set-env-vars "ENVIRONMENT=dev" \
+            --set-env-vars "DEBUG=true,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY_DEV }}" \
+            --set-env-vars "DB_ENGINE=postgres,DB_NAME=axi_dev,DB_USER=axi_dev,DB_PASSWORD=${{ secrets.DB_PASSWORD_DEV }},DB_HOST=/cloudsql/$CONN_NAME" \
+            --set-env-vars "USE_GCS=true,GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME_DEV }}" \
+            --set-env-vars "LOG_LEVEL=INFO,WEB_CONCURRENCY=2" \
             --cpu=1 --memory=512Mi --timeout=300
 
-      - name: Bootstrap Users
+      - name: Bootstrap Users Dev
         run: |
-          echo "🔧 Creating bootstrap users..."
-          gcloud run jobs create bootstrap-users-${{ github.run_number }} \
+          echo "Creating bootstrap users for dev..."
+          gcloud run jobs create bootstrap-users-dev-${{ github.run_number }} \
             --image "$IMAGE" \
             --region "$REGION" \
             --set-cloudsql-instances "$CONN_NAME" \
-            --set-env-vars "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }},DB_ENGINE=postgres,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_HOST=/cloudsql/$CONN_NAME" \
+            --set-env-vars "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY_DEV }},DB_ENGINE=postgres,DB_NAME=axi_dev,DB_USER=axi_dev,DB_PASSWORD=${{ secrets.DB_PASSWORD_DEV }},DB_HOST=/cloudsql/$CONN_NAME" \
             --command python \
             --args "manage.py,bootstrap" \
             --execute-now \
             --wait
-          echo "✅ Bootstrap completed!"      
+          echo "Bootstrap dev completed!"
+
