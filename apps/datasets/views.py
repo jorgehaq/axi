@@ -21,6 +21,7 @@ from .services import (
     compute_correlation, compute_trend
 )
 from .serializers import TrendParamsSerializer, RowsParamsSerializer, FileUploadSerializer
+from .tasks import process_dataset_upload
 
 
 def _json_error(message: str, status: int = 400):
@@ -87,6 +88,11 @@ def upload_view(request):
     if not serializer.is_valid():
         return Response({"error": {"code": "bad_request", "message": serializer.errors}}, status=400)
     datafile = DataFile.objects.create(file=serializer.validated_data["file"], uploaded_by=request.user)
+    # Fire-and-forget background processing
+    try:
+        process_dataset_upload.delay(datafile.id)
+    except Exception:
+        pass
     return Response({"message": "File uploaded successfully", "id": datafile.id})
 
 
