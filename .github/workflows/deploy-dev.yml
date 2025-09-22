@@ -7,7 +7,7 @@ on:
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_DEV }}
   REGION: us-central1
-  REPO: axi-dev-repo
+  REPO: analytics-repo
   SERVICE_NAME: axi-dev-api
 
 jobs:
