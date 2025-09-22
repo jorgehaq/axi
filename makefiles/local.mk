@@ -57,3 +57,13 @@ local-test-oauth2:
 
 local-test-missing:
 	bash scripts/test_missing_endpoints.sh local
+
+local-test-celery:
+	curl -s http://localhost:5555/api/workers  # Flower API
+	.venv/bin/python -c "from axi.celery import app; print(app.control.inspect().active())"
+
+local-django-shell:
+	export $(shell grep -v '^#' .env.local | xargs) && .venv/bin/python manage.py shell
+
+local-test-celery-manual:
+	export $(shell grep -v '^#' .env.local | xargs) && .venv/bin/python -c "from apps.datasets.tasks import process_dataset_upload; result = process_dataset_upload.delay(1); print(f'Task ID: {result.id}'); print(f'Ready: {result.ready()}')"

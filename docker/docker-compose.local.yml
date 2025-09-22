@@ -9,7 +9,8 @@ services:
     depends_on: [redis]
     volumes:
       - ../:/app
-    env_file: ../.env.local
+    environment:
+    - CELERY_BROKER_URL=redis://redis:6379/0
     working_dir: /app
 
   flower:
