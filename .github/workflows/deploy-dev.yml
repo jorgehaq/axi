@@ -6,9 +6,9 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_DEV }}
-  REGION: us-central1
-  REPO: analytics-repo
-  SERVICE_NAME: axi-dev-api
+  REGION: ${{ secrets.GCP_REGION_DEV }}
+  REPO: ${{ secrets.GAR_REPO_DEV }}
+  SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_DEV }}
 
 jobs:
   deploy:
