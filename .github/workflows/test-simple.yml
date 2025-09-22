@@ -1,0 +1,17 @@
+name: Test Simple
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello World
+        run: echo "Hello World - GitHub Actions is working!"
+
+      - name: Check environment
+        run: |
+          echo "Running on: $(uname -a)"
+          echo "Current user: $(whoami)"
+          echo "Current directory: $(pwd)"

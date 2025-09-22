@@ -1,0 +1,31 @@
+name: Test Auth
+
+on:
+  push:
+    branches: [ "dev" ]
+
+jobs:
+  test-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test secret exists
+        run: |
+          if [ -n "${{ secrets.GCP_SA_KEY_DEV }}" ]; then
+            echo "✅ GCP_SA_KEY_DEV exists"
+          else
+            echo "❌ GCP_SA_KEY_DEV missing"
+          fi
+
+      - name: Test GCP auth
+        if: ${{ secrets.GCP_SA_KEY_DEV }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - name: Test gcloud
+        if: ${{ secrets.GCP_SA_KEY_DEV }}
+        run: |
+          gcloud auth list
+          gcloud config get-value project

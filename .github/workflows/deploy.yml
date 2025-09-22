@@ -20,7 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Auth con SA key (si luego migras a WIF, cambiamos esto)
       - name: Preflight auth inputs
         run: |
           if [ -z "${{ secrets.GCP_SA_KEY }}" ] && { [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; }; then
@@ -29,13 +28,13 @@ jobs:
           fi
 
       - name: Auth via Service Account JSON
-        if: ${{ secrets.GCP_SA_KEY != '' }}
+        if: secrets.GCP_SA_KEY
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Auth via Workload Identity Federation
-        if: ${{ secrets.GCP_SA_KEY == '' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER && secrets.GCP_SERVICE_ACCOUNT }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -43,7 +42,6 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      # 🔧 Fijar proyecto para todos los gcloud
       - name: Set gcloud project
         run: gcloud config set project "$PROJECT_ID"
 
@@ -91,4 +89,4 @@ jobs:
             --args "manage.py,bootstrap" \
             --execute-now \
             --wait
-          echo "✅ Bootstrap completed!"      
+          echo "✅ Bootstrap completed!"

@@ -1,0 +1,12 @@
+name: Test Minimal
+
+on:
+  push:
+    branches: [ "dev" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test workflow
+        run: echo "Workflow is working!"
