@@ -28,13 +28,13 @@ jobs:
           fi
 
       - name: Auth via Service Account JSON
-        if: ${{ secrets.GCP_SA_KEY_DEV != '' }}
+        if: ${{ secrets.GCP_SA_KEY_DEV }}
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
 
       - name: Auth via Workload Identity Federation
-        if: ${{ secrets.GCP_SA_KEY_DEV == '' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV != '' && secrets.GCP_SERVICE_ACCOUNT_DEV != '' }}
+        if: ${{ !secrets.GCP_SA_KEY_DEV && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV && secrets.GCP_SERVICE_ACCOUNT_DEV }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DEV }}
