@@ -54,7 +54,7 @@ jobs:
             --region "$REGION" \
             --platform managed \
             --allow-unauthenticated \
-            --add-cloudsql-instances "$CONN_NAME" \
+            --set-cloudsql-instances "$CONN_NAME" \
             --set-env-vars "ENVIRONMENT=dev" \
             --set-env-vars "DEBUG=true,SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY_DEV }}" \
             --set-env-vars "DB_ENGINE=postgres,DB_NAME=axi_dev,DB_USER=axi_dev,DB_PASSWORD=${{ secrets.DB_PASSWORD_DEV }},DB_HOST=/cloudsql/$CONN_NAME" \
