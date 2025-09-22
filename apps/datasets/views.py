@@ -264,3 +264,13 @@ def cohort_analysis_view(request, id):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    user = request.user
+    return Response({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+    })

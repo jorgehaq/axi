@@ -3,14 +3,13 @@ from rest_framework.views import exception_handler as drf_exception_handler
 from rest_framework.response import Response
 from rest_framework import status
 
+
 def custom_exception_handler(exc, context) -> Response | None:
     response = drf_exception_handler(exc, context)
     if response is None:
-        # Error no manejado por DRF -> 500
         return Response({"error": {"code": "server_error", "message": str(exc)}},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Normaliza formato
     detail = response.data
     if isinstance(detail, dict) and "detail" in detail:
         detail = {"message": detail["detail"]}
@@ -22,6 +21,7 @@ def custom_exception_handler(exc, context) -> Response | None:
     }}
     return response
 
+
 def _status_code_to_code(st: int) -> str:
     if st == 400: return "bad_request"
     if st == 401: return "unauthorized"
@@ -31,7 +31,9 @@ def _status_code_to_code(st: int) -> str:
     if st >= 500: return "server_error"
     return "error"
 
+
 def _extract_message(detail: Any) -> str:
     if isinstance(detail, dict) and "message" in detail:
         return str(detail["message"])
     return "Request failed"
+

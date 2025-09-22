@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_spectacular',
-    'core',  # App base v1 (se mantiene por compatibilidad)
     'apps.auth',
     'apps.datasets',
     'apps.analytics',
@@ -61,7 +60,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.middleware.StructuredLoggingMiddleware',
+    'apps.datasets.middleware.StructuredLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'axi.urls'
@@ -180,7 +179,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "EXCEPTION_HANDLER": "core.errors.custom_exception_handler",
+    "EXCEPTION_HANDLER": "apps.datasets.errors.custom_exception_handler",
 }
 
 SIMPLE_JWT = {
