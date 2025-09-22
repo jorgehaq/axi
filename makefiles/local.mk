@@ -48,3 +48,9 @@ local-django:
 # tests
 local-test-env:
 	bash scripts/test_all_environment.sh local
+
+local-test-makefile:
+	bash scripts/test_makefile_instructions.sh local
+
+local-test-oauth2:
+	bash scripts/test_oauth2_integration.sh local
