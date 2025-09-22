@@ -1,6 +1,6 @@
 
 """
-Django settings for analytics_api project.
+Configuración Django para AXI.
 Configuración por ambientes: local, docker, production
 """
 
@@ -64,8 +64,8 @@ MIDDLEWARE = [
     'core.middleware.StructuredLoggingMiddleware',
 ]
 
-ROOT_URLCONF = 'analytics_api.urls'
-WSGI_APPLICATION = 'analytics_api.wsgi.application'
+ROOT_URLCONF = 'axi.urls'
+WSGI_APPLICATION = 'axi.wsgi.application'
 
 TEMPLATES = [
     {

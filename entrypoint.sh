@@ -9,5 +9,5 @@ python manage.py migrate --noinput
 PORT=${PORT:-8000}
 
 # Gunicorn para producción
-exec gunicorn analytics_api.wsgi:application \
+exec gunicorn axi.wsgi:application \
   --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-3} --timeout 120

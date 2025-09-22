@@ -5,7 +5,7 @@ services:
 
   celery:
     build: ../
-    command: celery -A analytics_api worker -l info
+    command: celery -A axi worker -l info
     depends_on: [redis]
     volumes:
       - ../:/app
