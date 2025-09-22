@@ -34,6 +34,7 @@ urlpatterns = [
 
     # Rutas v2
     path("api/v1/", include("apps.datasets.urls")),
+    path("api/v1/", include("apps.auth.urls")),
 ]
 
 urlpatterns += [path("api/me/", me, name="me")]

@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     login_view, upload_view, health, data_preview, data_summary, data_rows,
     data_correlation, data_trend, get_download_url, bulk_upload_view,
-    bulk_delete_view, cohort_analysis_view,
+    bulk_delete_view, cohort_analysis_view, health_integrations, nexus_webhook,
+    dataset_metrics,
 )
 
 urlpatterns = [
@@ -18,4 +19,7 @@ urlpatterns = [
     path("datasets/<int:id>/trend", data_trend, name="data_trend"),
     path("datasets/<int:id>/cohort-analysis", cohort_analysis_view, name="cohort_analysis"),
     path("datasets/<int:id>/download-url/", get_download_url, name="download_url"),
+    path("health/integrations", health_integrations, name="health_integrations"),
+    path("webhooks/nexus", nexus_webhook, name="nexus_webhook"),
+    path("datasets/<int:id>/metrics", dataset_metrics, name="dataset_metrics"),
 ]

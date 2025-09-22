@@ -22,6 +22,8 @@ from .services import (
 )
 from .serializers import TrendParamsSerializer, RowsParamsSerializer, FileUploadSerializer
 from .tasks import process_dataset_upload
+from django.conf import settings
+import requests
 
 
 def _json_error(message: str, status: int = 400):
@@ -94,6 +96,56 @@ def upload_view(request):
     except Exception:
         pass
     return Response({"message": "File uploaded successfully", "id": datafile.id})
+
+
+@api_view(["GET"])  # Simple integrations health
+@permission_classes([AllowAny])
+def health_integrations(request):
+    def check(url: str | None, timeout: int = 2):
+        if not url:
+            return {"status": "unknown"}
+        try:
+            r = requests.get(url, timeout=timeout)
+            return {"status": "ok" if r.status_code < 500 else "degraded", "code": r.status_code}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    out = {
+        "nexus": check(getattr(settings, "NEXUS_WEBHOOK_URL", None)),
+        "echo": check(getattr(settings, "ECHO_URL", None)),
+        "aide": check(getattr(settings, "AIDE_URL", None)),
+    }
+    return Response(out)
+
+
+@api_view(["POST"])  # Nexus webhook receiver (portfolio-safe)
+@permission_classes([AllowAny])
+def nexus_webhook(request):
+    payload = request.data or {}
+    event = payload.get("event")
+    dataset_id = payload.get("dataset_id")
+    # For portfolio: just acknowledge
+    return Response({"status": "received", "event": event, "dataset_id": dataset_id})
+
+
+@api_view(["GET"])  # Metrics for GRASP
+@permission_classes([IsAuthenticated, IsOwnerOfDataFile])
+def dataset_metrics(request, id: int):
+    datafile = get_object_or_404(DataFile, pk=id)
+    try:
+        with datafile.file.open('r') as f:
+            df = pd.read_csv(f, dtype_backend="pyarrow")
+    except Exception as e:
+        return Response({"error": {"code": "bad_request", "message": str(e)}}, status=400)
+
+    metrics = {
+        "rows": int(len(df)),
+        "columns": int(len(df.columns)),
+        "size_bytes": datafile.file.size if hasattr(datafile.file, 'size') else None,
+        "created_at": datafile.created_at,
+        "schema": list(map(str, df.columns.tolist())),
+    }
+    return Response({"id": datafile.id, "metrics": metrics})
 
 
 @api_view(["GET"])
