@@ -1,0 +1,33 @@
+services:
+  redis:
+    image: redis:6
+    ports: ["6379:6379"]
+
+  celery:
+    build: ../
+    command: celery -A axi worker -l info
+    depends_on: [redis]
+    volumes:
+      - ../:/app
+    env_file: ../.env.local
+    working_dir: /app
+
+  flower:
+    image: mher/flower:1.2
+    ports: ["5555:5555"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on: [redis]
+
+  minio:
+    image: minio/minio:latest
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data:

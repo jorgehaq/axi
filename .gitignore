@@ -15,10 +15,7 @@ static/
 media/
 
 # Environment files (secrets)
-.env
-.env.local
-.env.gcp
-.env.gcp-local
+.env*
 
 # Database
 db.sqlite3
@@ -53,12 +50,11 @@ Thumbs.db
 test_data.csv
 *.csv
 
-# Environment files (contain secrets)
-.env.docker
+# Environment files
+.env.*
 
 # Test data files
 *.csv
 
-# test_all_environment.sh
-test_all_environment.sh
-start.sh
+# instructions.md
+instructions.md
